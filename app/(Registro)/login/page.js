@@ -130,13 +130,6 @@ export default function LoginPage() {
           {signingIn ? 'Entrando...' : 'Entrar'}
         </button>
       </form>
-      <button
-        onClick={handlePasswordReset}
-        disabled={resetting}
-        className="mt-4 text-blue-600 underline hover:text-blue-800"
-      >
-        {resetting ? 'Enviando...' : 'Olvidé mi contraseña'}
-      </button>
       <p className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
         ¿No tienes cuenta?{' '}
         <button
