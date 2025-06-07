@@ -13,7 +13,7 @@ export default function LoginPage() {
   const [resetting, setResetting] = useState(false);
   const router = useRouter();
 
-  // Loader mientras verifica sesión
+  // Loader mientras verifica sesión - se muestra un spinner
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
