@@ -3,6 +3,7 @@
 import { supabase } from '@/utils/supabase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 export default function TallerPage() {
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function TallerPage() {
 
   if (checkingAccess) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <p className="text-lg text-gray-700 dark:text-gray-200">
           Verificando acceso...
         </p>
@@ -48,7 +49,7 @@ export default function TallerPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 relative p-8">
+    <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative p-8">
       <div className="w-full max-w-lg flex flex-col sm:flex-row justify-between items-center gap-4 mb-8 mx-auto">
         {isAdmin && (
           <button
@@ -69,9 +70,18 @@ export default function TallerPage() {
         </button>
       </div>
       <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-10 flex flex-col items-center">
-        <h1 className="text-3xl font-bold text-blue-700 dark:text-blue-300 mb-4 text-center">
+        <Image
+          src="/CEE-MARCA.png"
+          alt="CEE Logo"
+          width={90}
+          height={90}
+          className="mb-6 transition-all duration-300 dark:invert"
+          priority
+        />
+        <h1 className="text-3xl font-bold text-blue-700 dark:text-blue-300 mb-2 text-center drop-shadow">
           Módulo de Taller
         </h1>
+        <div className="w-20 h-1 bg-blue-600 rounded-full mb-8 mx-auto" />
         <p className="mb-8 text-lg text-gray-700 dark:text-gray-200 text-center">
           ¡Hola{' '}
           <span className="font-semibold text-blue-700 dark:text-blue-300">

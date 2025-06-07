@@ -169,100 +169,103 @@ export default function UsuariosAdminPage() {
   }
 
   return (
-    <main className="min-h-screen p-8 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
-      <div className="w-full max-w-3xl mx-auto flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
+    <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-900 dark:text-white p-8">
+      <div className="w-full max-w-3xl flex flex-col sm:flex-row justify-between items-center mb-8 gap-4">
         <button
           onClick={handleBack}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 transition w-full sm:w-auto"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md font-semibold shadow hover:bg-gray-300 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 transition w-full sm:w-auto"
         >
           <span aria-hidden="true">←</span> Volver
         </button>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200 border border-red-300 transition w-full sm:w-auto"
+          className="flex items-center gap-2 px-4 py-2 bg-red-200 text-red-700 rounded-md font-semibold shadow hover:bg-red-300 transition w-full sm:w-auto"
         >
           <span aria-hidden="true">⎋</span> Cerrar sesión
         </button>
       </div>
-      <h1 className="text-2xl font-bold mb-8 text-center text-blue-800 dark:text-blue-200">
-        Administrar usuarios y roles
-      </h1>
-      <div className="w-full max-w-3xl mx-auto overflow-x-auto">
-        <table className="min-w-full text-sm text-left mb-6 border rounded-lg overflow-hidden shadow bg-white dark:bg-gray-800">
-          <thead>
-            <tr className="bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100">
-              <th className="px-2 py-2">Email</th>
-              <th className="px-2 py-2">Rol</th>
-              <th className="px-2 py-2">Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            {usuarios.map((user) => (
-              <tr
-                key={user.id}
-                className="border-b last:border-b-0 hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                <td className="px-2 py-1">{user.email}</td>
-                <td className="px-2 py-1">
-                  <select
-                    value={editingRoles[user.id]}
-                    onChange={(e) => handleRoleChange(user.id, e.target.value)}
-                    className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
-                    disabled={saving}
-                  >
-                    {ROLES.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="px-2 py-1">
-                  <button
-                    onClick={() => {
-                      setUserToDelete(user);
-                      setShowConfirm(true);
-                    }}
-                    className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 border border-red-300 transition text-xs"
-                    disabled={saving}
-                  >
-                    Eliminar
-                  </button>
-                </td>
+      <div className="w-full max-w-3xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-10 flex flex-col items-center">
+        <h1 className="text-3xl font-bold mb-6 text-blue-700 dark:text-blue-300 text-center drop-shadow">
+          Administrar usuarios y roles
+        </h1>
+        <div className="w-20 h-1 bg-blue-600 rounded-full mb-8 mx-auto" />
+        <div className="w-full overflow-x-auto">
+          <table className="min-w-full text-sm text-left mb-6 border rounded-lg overflow-hidden shadow bg-white dark:bg-gray-800">
+            <thead>
+              <tr className="bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                <th className="px-2 py-2">Email</th>
+                <th className="px-2 py-2">Rol</th>
+                <th className="px-2 py-2">Acción</th>
               </tr>
-            ))}
-            {usuarios.length === 0 && (
-              <tr>
-                <td colSpan={3} className="text-center py-4 text-gray-500">
-                  No hay usuarios registrados.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        <div className="flex justify-end mt-6">
+            </thead>
+            <tbody>
+              {usuarios.map((user) => (
+                <tr
+                  key={user.id}
+                  className="border-b last:border-b-0 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <td className="px-2 py-1">{user.email}</td>
+                  <td className="px-2 py-1">
+                    <select
+                      value={editingRoles[user.id]}
+                      onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                      className="border rounded px-2 py-1 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+                      disabled={saving}
+                    >
+                      {ROLES.map((role) => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="px-2 py-1">
+                    <button
+                      onClick={() => {
+                        setUserToDelete(user);
+                        setShowConfirm(true);
+                      }}
+                      className="px-3 py-1 bg-red-200 text-red-700 rounded font-semibold shadow hover:bg-red-300 transition text-xs"
+                      disabled={saving}
+                    >
+                      Eliminar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {usuarios.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="text-center py-4 text-gray-500">
+                    No hay usuarios registrados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex justify-end mt-6 w-full">
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 border border-blue-300 transition disabled:opacity-60"
+            className="px-6 py-2 bg-blue-700 text-white rounded-lg font-semibold shadow hover:bg-blue-800 transition disabled:opacity-60"
           >
             {saving ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
+        {message && (
+          <div className="mt-6 flex justify-center w-full">
+            <span
+              className={`px-4 py-2 rounded font-semibold shadow text-center
+                ${message.includes('eliminado') || message.includes('guardados')
+                  ? 'bg-green-100 text-green-700 border border-green-300'
+                  : 'bg-red-100 text-red-700 border border-red-300'}
+              `}
+            >
+              {message}
+            </span>
+          </div>
+        )}
       </div>
-      {message && (
-        <div className="mt-6 flex justify-center">
-          <span
-            className={`px-4 py-2 rounded font-semibold shadow text-center
-              ${message.includes('eliminado') || message.includes('guardados')
-                ? 'bg-green-100 text-green-700 border border-green-300'
-                : 'bg-red-100 text-red-700 border border-red-300'}
-            `}
-          >
-            {message}
-          </span>
-        </div>
-      )}
       {showConfirm && userToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 w-full max-w-sm flex flex-col items-center">
@@ -291,14 +294,14 @@ export default function UsuariosAdminPage() {
                   if (data.success) {
                     setUsuarios((prev) => prev.filter((u) => u.id !== userToDelete.id));
                     setMessage('Usuario eliminado correctamente');
-                    setTimeout(() => setMessage(''), 5000); // Oculta el mensaje después de 5 segundos
+                    setTimeout(() => setMessage(''), 5000);
                   } else {
                     setMessage('Error al eliminar usuario: ' + (data.error || ''));
                   }
                   setSaving(false);
                   setUserToDelete(null);
                 }}
-                className="flex-1 px-4 py-2 bg-red-500 text-white rounded font-semibold hover:bg-red-600 transition"
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition"
               >
                 Sí, eliminar
               </button>

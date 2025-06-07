@@ -3,6 +3,7 @@
 import { supabase } from '@/utils/supabase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <main className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+      <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg flex flex-col items-center">
           <svg
             className="animate-spin h-8 w-8 text-blue-600 mb-4"
@@ -78,7 +79,7 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white p-8">
+    <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-900 dark:text-white p-8">
       <div className="w-full max-w-2xl flex flex-col sm:flex-row justify-between items-center gap-4 mb-8 mx-auto">
         <button
           onClick={() => router.push('/dashboard/taller')}
@@ -94,9 +95,11 @@ export default function AdminDashboardPage() {
         </button>
       </div>
       <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-10 flex flex-col items-center">
+        {/* No se usa el logo PNG aquí */}
         <h1 className="text-4xl font-extrabold mb-4 text-blue-700 dark:text-blue-300 text-center drop-shadow">
           Panel de Administrador
         </h1>
+        <div className="w-20 h-1 bg-blue-600 rounded-full mb-8 mx-auto" />
         <p className="mb-8 text-lg text-gray-700 dark:text-gray-200 text-center">
           ¡Hola{' '}
           <span className="font-semibold text-blue-700 dark:text-blue-300">

@@ -166,8 +166,8 @@ export default function UnidadNegocioPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center bg-gray-50 dark:bg-gray-900 p-8">
-      <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+    <main className="min-h-screen flex flex-col items-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-8">
+      <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-10">
         {/* Botón volver */}
         <div className="mb-4">
           <button
@@ -178,7 +178,7 @@ export default function UnidadNegocioPage() {
           </button>
         </div>
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+          <h1 className="text-3xl font-bold text-blue-700 dark:text-blue-300 drop-shadow">
             Unidades de negocio
           </h1>
           <button

@@ -3,6 +3,7 @@
 import { supabase } from '@/utils/supabase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 function formatearFechaArg(fecha) {
   if (!fecha) return '-';
@@ -21,9 +22,9 @@ export default function Page() {
   const router = useRouter();
   const [tipos, setTipos] = useState([]);
   const [capacidades, setCapacidades] = useState([]);
-  const [unidadesNegocio, setUnidadesNegocio] = useState([]); // NUEVO
+  const [unidadesNegocio, setUnidadesNegocio] = useState([]);
   const [form, setForm] = useState({
-    unidad_de_negocio: '', // NUEVO
+    unidad_de_negocio: '',
     tipo: '',
     capacidad: '',
     unidades: 1,
@@ -37,13 +38,16 @@ export default function Page() {
   const [eliminarLoading, setEliminarLoading] = useState(null);
   const [pagina, setPagina] = useState(1);
   const equiposPorPagina = 10;
-
-  // Filtros
   const [filtroTipo, setFiltroTipo] = useState('');
   const [filtroMes, setFiltroMes] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [fechaError, setFechaError] = useState('');
+  const [mensajeExito, setMensajeExito] = useState('');
+  const [mensajeError, setMensajeError] = useState('');
+  const [modalEliminar, setModalEliminar] = useState({ open: false, id: null, equipo_asignado: null });
+  const [checkingAccess, setCheckingAccess] = useState(true);
 
   // Cargar tipos y capacidades
   useEffect(() => {
@@ -92,8 +96,6 @@ export default function Page() {
   };
 
   // Cambia el handleChange para soportar unidad_de_negocio
-  const [fechaError, setFechaError] = useState('');
-
   const handleChange = e => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
@@ -115,24 +117,18 @@ export default function Page() {
     if (name === 'tipo') setForm(prev => ({ ...prev, capacidad: '' }));
   };
 
-  const [mensajeExito, setMensajeExito] = useState('');
-  const [mensajeError, setMensajeError] = useState('');
-
   // Cambia el handleSubmit para mostrar el mensaje bonito
   const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true);
     const { unidad_de_negocio, tipo, capacidad, unidades, fechaDesde, fechaHasta, observaciones } = form;
 
-    // Validación de unidad de negocio (ya es required en el select, pero por seguridad)
     if (!unidad_de_negocio) {
       setLoading(false);
       setMensajeError('Debe seleccionar una unidad de negocio.');
       setTimeout(() => setMensajeError(''), 7000);
       return;
     }
-
-    // Validación de fechas
     if (!fechaDesde || !fechaHasta) {
       setLoading(false);
       setMensajeError('Debe ingresar ambas fechas.');
@@ -179,10 +175,10 @@ export default function Page() {
       });
       fetchSolicitudes(userEmail);
       router.refresh();
-      setTimeout(() => setMensajeExito(''), 3500); // Éxito: 3.5s
+      setTimeout(() => setMensajeExito(''), 3500);
     } else {
       setMensajeError('Error al enviar la solicitud');
-      setTimeout(() => setMensajeError(''), 7000); // Error: 7s
+      setTimeout(() => setMensajeError(''), 7000);
     }
   };
 
@@ -192,9 +188,6 @@ export default function Page() {
   };
 
   // Modal de confirmación para eliminar
-  const [modalEliminar, setModalEliminar] = useState({ open: false, id: null, equipo_asignado: null });
-
-  // Modifica handleEliminar para abrir el modal
   const handleEliminar = (id, equipo_asignado) => {
     if (equipo_asignado) {
       alert('No se puede eliminar: ya tiene equipo asignado. Solicitar a taller.');
@@ -203,7 +196,6 @@ export default function Page() {
     setModalEliminar({ open: true, id, equipo_asignado });
   };
 
-  // Nueva función para confirmar eliminación
   const confirmarEliminar = async () => {
     setEliminarLoading(modalEliminar.id);
     const { error } = await supabase.from('solicitudes_equipos').delete().eq('id', modalEliminar.id);
@@ -217,10 +209,8 @@ export default function Page() {
   };
 
   // --- FILTRADO ---
-  // Filtrar por tipo y mes
   const solicitudesFiltradas = solicitudes.filter(s => {
     const coincideTipo = !filtroTipo || s.tipo === filtroTipo;
-    // fecha_desde formato YYYY-MM-DD
     const coincideMes = s.fecha_desde && s.fecha_desde.startsWith(filtroMes);
     return coincideTipo && coincideMes;
   });
@@ -232,12 +222,9 @@ export default function Page() {
     pagina * equiposPorPagina
   );
 
-  // Resetear página si cambia el filtro
   useEffect(() => {
     setPagina(1);
   }, [filtroTipo, filtroMes]);
-
-  const [checkingAccess, setCheckingAccess] = useState(true);
 
   // Validar rol
   useEffect(() => {
@@ -265,7 +252,7 @@ export default function Page() {
 
   if (checkingAccess) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <p className="text-lg text-gray-700 dark:text-gray-200">
           Verificando acceso...
         </p>
@@ -274,9 +261,9 @@ export default function Page() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col md:flex-row items-start justify-center bg-gray-50 dark:bg-gray-900 relative p-4">
+    <main className="min-h-screen flex flex-col md:flex-row items-start justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative p-4">
       {/* Barra superior con mensaje y botón */}
-      <div className="w-full flex items-center justify-between px-8 py-3 bg-gray-200 dark:bg-gray-700 rounded-xl shadow mb-6 absolute top-2 left-1/2 -translate-x-1/2 max-w-5xl z-10">
+      <div className="w-full flex items-center justify-between px-8 py-3 bg-white dark:bg-gray-800 rounded-xl shadow mb-6 absolute top-2 left-1/2 -translate-x-1/2 max-w-5xl z-10 border border-gray-200 dark:border-gray-700">
         <span className="font-semibold text-lg text-gray-900 dark:text-gray-100">
           Bienvenido{userEmail ? `, ${userEmail}` : ''}
         </span>
@@ -287,10 +274,20 @@ export default function Page() {
           Cerrar sesión
         </button>
       </div>
+      {/* Formulario de solicitud */}
       <div className="w-full max-w-lg bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 flex flex-col items-center mt-28 md:mt-28">
-        <h1 className="text-2xl font-bold mb-6 text-blue-700 dark:text-blue-300 text-center">
+        <Image
+          src="/CEE-MARCA.png"
+          alt="CEE Logo"
+          width={80}
+          height={80}
+          className="mb-4 transition-all duration-300 dark:invert"
+          priority
+        />
+        <h1 className="text-2xl font-bold mb-2 text-blue-700 dark:text-blue-300 text-center">
           Solicitar equipos
         </h1>
+        <div className="w-16 h-1 bg-blue-600 rounded-full mb-6 mx-auto" />
         {mensajeExito && (
           <div className="mb-4 w-full flex items-center justify-center">
             <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-green-100 border border-green-300 text-green-800 shadow animate-fade-in">
@@ -471,7 +468,6 @@ export default function Page() {
       </div>
       {/* Lista de solicitudes a la derecha */}
       <div className="w-full max-w-3xl mt-8 md:mt-28 md:ml-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 overflow-x-auto">
-        {/* ↑ Cambia md:mt-0 por md:mt-28 */}
         <h2 className="text-xl font-bold mb-4 text-gray-700 dark:text-gray-200 text-center">
           Mis solicitudes
         </h2>
@@ -538,25 +534,30 @@ export default function Page() {
                       )}
                     </td>
                     <td className="px-2 py-1">
-                      <button
-                        onClick={() => handleEliminar(s.id, s.equipo_asignado)}
-                        disabled={!!s.equipo_asignado || eliminarLoading === s.id}
-                        className={`px-3 py-1 rounded text-xs font-semibold shadow transition
-                          ${s.equipo_asignado
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-red-500 text-white hover:bg-red-600'}
-                        `}
-                      >
-                        {s.equipo_asignado
-                          ? 'No se puede eliminar'
-                          : eliminarLoading === s.id
-                            ? 'Eliminando...'
-                            : 'Eliminar'}
-                      </button>
-                      {s.equipo_asignado && (
-                        <div className="text-xs text-red-600 mt-1">
-                          No puede eliminar: ya tiene equipo asignado. Solicitar a taller.
+                      {s.equipo_asignado ? (
+                        <div className="relative group inline-block">
+                          <button
+                            disabled
+                            className="px-3 py-1 rounded text-xs font-semibold shadow bg-gray-300 text-gray-500 cursor-not-allowed"
+                          >
+                            No se puede eliminar
+                          </button>
+                          <div
+                            className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 bg-red-600 text-white text-xs rounded px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20"
+                            style={{ bottom: '-2.5rem', whiteSpace: 'normal' }}
+                          >
+                            No puede eliminar: ya tiene equipo asignado. Solicitar a taller.
+                          </div>
                         </div>
+                      ) : (
+                        <button
+                          onClick={() => handleEliminar(s.id, s.equipo_asignado)}
+                          disabled={eliminarLoading === s.id}
+                          className={`px-3 py-1 rounded text-xs font-semibold shadow transition
+                            bg-red-500 text-white hover:bg-red-600`}
+                        >
+                          {eliminarLoading === s.id ? 'Eliminando...' : 'Eliminar'}
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -586,7 +587,6 @@ export default function Page() {
           </>
         )}
       </div>
-
       {/* Modal de confirmación de eliminación */}
       {modalEliminar.open && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">

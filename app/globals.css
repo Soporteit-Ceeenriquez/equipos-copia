@@ -19,8 +19,31 @@
   }
 }
 
+@font-face {
+  font-family: 'Mark Pro';
+  src: url('/fonts/MarkProRegular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Mark Pro';
+  src: url('/fonts/MarkProMedium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Mark Pro';
+  src: url('/fonts/MarkProBold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Aplica la fuente globalmente */
 body {
+  font-family: 'Mark Pro', Arial, sans-serif;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }

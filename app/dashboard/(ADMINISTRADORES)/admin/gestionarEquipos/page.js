@@ -195,19 +195,19 @@ export default function GestionarEquiposPage() {
 
   if (checkingAccess) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <p className="text-lg text-gray-700 dark:text-gray-200">Verificando acceso...</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center bg-gradient-to-br from-blue-50 to-blue-200 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-white p-8">
+    <main className="min-h-screen flex flex-col items-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-900 dark:text-white p-8">
       {/* Botón para volver atrás */}
       <div className="w-full max-w-6xl flex justify-start mb-4">
         <button
           onClick={() => router.back()}
-          className="px-4 py-2 bg-gray-200 text-gray-700 rounded font-semibold shadow hover:bg-gray-300 transition text-sm"
+          className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded font-semibold shadow hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm"
         >
           ← Volver
         </button>
@@ -224,7 +224,7 @@ export default function GestionarEquiposPage() {
             >
               + Nuevo equipo
             </button>
-            <label className="px-4 py-2 bg-green-600 text-white rounded font-semibold shadow hover:bg-green-700 transition cursor-pointer">
+            <label className="px-4 py-2 bg-green-700 text-white rounded font-semibold shadow hover:bg-green-800 transition cursor-pointer">
               {csvLoading ? 'Cargando...' : 'Cargar CSV/Excel'}
               <input
                 ref={fileInputRef}
@@ -273,7 +273,7 @@ export default function GestionarEquiposPage() {
                 setFiltroTipo('');
                 setFiltroCodigo('');
               }}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded font-semibold shadow hover:bg-gray-300 transition text-sm"
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded font-semibold shadow hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm"
               style={{ minWidth: 120 }}
             >
               Quitar filtros
@@ -348,7 +348,7 @@ export default function GestionarEquiposPage() {
           <button
             onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
             disabled={paginaActual === 1}
-            className="px-3 py-1 bg-gray-200 text-gray-700 rounded shadow hover:bg-gray-300 transition text-sm disabled:opacity-50"
+            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded shadow hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm disabled:opacity-50"
           >
             Anterior
           </button>
@@ -374,7 +374,7 @@ export default function GestionarEquiposPage() {
                   className={`px-3 py-1 rounded shadow text-sm ${
                     paginaActual === page
                       ? 'bg-blue-700 text-white font-bold'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
                   {page}
@@ -384,7 +384,7 @@ export default function GestionarEquiposPage() {
           <button
             onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
             disabled={paginaActual === totalPaginas}
-            className="px-3 py-1 bg-gray-200 text-gray-700 rounded shadow hover:bg-gray-300 transition text-sm disabled:opacity-50"
+            className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded shadow hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm disabled:opacity-50"
           >
             Siguiente
           </button>

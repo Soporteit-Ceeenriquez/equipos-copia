@@ -3,6 +3,7 @@
 import { supabase } from '@/utils/supabase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -72,7 +73,7 @@ export default function LoginPage() {
 
   if (loading) {
     return (
-      <main className="flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+      <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg flex flex-col items-center">
           <svg className="animate-spin h-8 w-8 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -85,12 +86,23 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
-      <h1 className="text-2xl font-bold mb-4">Iniciar Sesión</h1>
+    <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-900 dark:text-white p-8">
+      <h1 className="text-3xl font-bold mb-4 text-center drop-shadow">Iniciar sesión</h1>
+      <div className="w-20 h-1 bg-blue-600 rounded-full mb-8 mx-auto" />
+      <div className="mb-8 flex items-center justify-center">
+        <Image
+          src="/CEE-MARCA.png"
+          alt="CEE Logo"
+          width={120}
+          height={120}
+          className="transition-all duration-300 dark:invert"
+          priority
+        />
+      </div>
       <form
         onSubmit={handleLogin}
         autoComplete="on"
-        className="w-full max-w-sm bg-white dark:bg-gray-800 p-6 rounded shadow"
+        className="w-full max-w-sm bg-white dark:bg-gray-800 p-6 rounded shadow flex flex-col gap-4"
       >
         <input
           type="email"
@@ -99,7 +111,7 @@ export default function LoginPage() {
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="username"
-          className="w-full p-2 border border-gray-300 rounded mb-4 dark:bg-gray-700 dark:border-gray-600"
+          className="w-full p-2 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
         />
         <input
           type="password"
@@ -108,12 +120,12 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
           required
           autoComplete="current-password"
-          className="w-full p-2 border border-gray-300 rounded mb-4 dark:bg-gray-700 dark:border-gray-600"
+          className="w-full p-2 border border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600"
         />
         <button
           type="submit"
           disabled={signingIn}
-          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded transition font-semibold"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition font-semibold text-base"
         >
           {signingIn ? 'Entrando...' : 'Entrar'}
         </button>

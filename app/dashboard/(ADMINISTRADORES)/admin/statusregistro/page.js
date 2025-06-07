@@ -87,22 +87,24 @@ export default function StatusRegistroPage() {
   // No mostrar nada hasta terminar la validación
   if (checkingAccess) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <p className="text-lg text-gray-700 dark:text-gray-200">Verificando acceso...</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 p-8 text-gray-900 dark:text-white">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 flex flex-col items-center">
+    <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-8 text-gray-900 dark:text-white">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-10 flex flex-col items-center">
         <button
           onClick={() => router.push('/dashboard/admin')}
           className="self-start mb-6 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition"
         >
           ← Volver
         </button>
-        <h1 className="text-2xl font-bold mb-6 text-center">Estado de Registro de Usuarios</h1>
+        <h1 className="text-2xl font-bold mb-6 text-center text-blue-700 dark:text-blue-300 drop-shadow">
+          Estado de Registro de Usuarios
+        </h1>
         {loading ? (
           <p className="mb-4">Cargando estado...</p>
         ) : status ? (
@@ -122,8 +124,8 @@ export default function StatusRegistroPage() {
                 disabled={saving || status.is_registration_open}
                 className={`px-6 py-2 rounded font-semibold shadow transition ${
                   status.is_registration_open
-                    ? 'bg-green-400 text-white cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700 text-white'
+                    ? 'bg-green-700 text-white opacity-60 cursor-not-allowed'
+                    : 'bg-green-800 hover:bg-green-900 text-white'
                 }`}
               >
                 Abrir registro
@@ -133,8 +135,8 @@ export default function StatusRegistroPage() {
                 disabled={saving || !status.is_registration_open}
                 className={`px-6 py-2 rounded font-semibold shadow transition ${
                   !status.is_registration_open
-                    ? 'bg-red-400 text-white cursor-not-allowed'
-                    : 'bg-red-600 hover:bg-red-700 text-white'
+                    ? 'bg-red-700 text-white opacity-60 cursor-not-allowed'
+                    : 'bg-red-800 hover:bg-red-900 text-white'
                 }`}
               >
                 Cerrar registro
