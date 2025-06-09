@@ -1,9 +1,9 @@
 'use client';
 
 import { supabase } from '@/utils/supabase';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 
 function formatearFechaArg(fecha) {
   if (!fecha) return '-';
@@ -16,6 +16,56 @@ function formatearFechaArg(fecha) {
   const mes = String(d.getMonth() + 1).padStart(2, '0');
   const anio = d.getFullYear();
   return `${dia}/${mes}/${anio}`;
+}
+
+// --- MODAL DE HISTORIAL DE ASIGNACIONES ---
+function ModalHistorial({ open, onClose, movimientos, formatearFechaArg }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{
+        background: 'rgba(0,0,0,0.60)', // Más difuminado
+        backdropFilter: 'blur(6px)'     // Más blur
+      }}
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-4 sm:p-6 w-full max-w-lg sm:max-w-2xl relative">
+        <button
+          className="absolute top-2 right-2 text-xl px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-full font-bold transition"
+          onClick={onClose}
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+        <h3 className="text-lg font-bold mb-4 text-blue-700 dark:text-blue-200">Historial de movimientos de la solicitud</h3>
+        {movimientos.length === 0 ? (
+          <div className="text-gray-600 dark:text-gray-300">No hay movimientos registrados.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-300 dark:border-gray-700">
+                  <th className="py-1 px-2 text-left">Equipo</th>
+                  <th className="py-1 px-2 text-left">Desde</th>
+                  <th className="py-1 px-2 text-left">Hasta</th>
+                  <th className="py-1 px-2 text-left">Motivo reemplazo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movimientos.map(mov => (
+                  <tr key={mov.id_asignacion} className="border-b border-gray-200 dark:border-gray-800">
+                    <td className="py-1 px-2">{mov.codigo_equipo}</td>
+                    <td className="py-1 px-2">{formatearFechaArg(mov.fecha_inicio_asignacion)}</td>
+                    <td className="py-1 px-2">{formatearFechaArg(mov.fecha_fin_asignacion)}</td>
+                    <td className="py-1 px-2">{mov.motivo_reemplazo || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function Page() {
@@ -48,6 +98,9 @@ export default function Page() {
   const [mensajeError, setMensajeError] = useState('');
   const [modalEliminar, setModalEliminar] = useState({ open: false, id: null, equipo_asignado: null });
   const [checkingAccess, setCheckingAccess] = useState(true);
+  const [asignaciones, setAsignaciones] = useState([]);
+  const [modalHistorialOpen, setModalHistorialOpen] = useState(false);
+  const [historialMovimientos, setHistorialMovimientos] = useState([]);
 
   // Cargar tipos y capacidades
   useEffect(() => {
@@ -85,13 +138,13 @@ export default function Page() {
     });
   }, []);
 
-  // Traer solicitudes del usuario
+  // Traer solicitudes del usuario (cambiar id → id_solicitud)
   const fetchSolicitudes = async (email) => {
     const { data, error } = await supabase
       .from('solicitudes_equipos')
       .select('*')
       .eq('correo_creador', email)
-      .order('id', { ascending: false });
+      .order('id_solicitud', { ascending: false }); // Cambiado id → id_solicitud
     if (!error) setSolicitudes(data);
   };
 
@@ -117,7 +170,7 @@ export default function Page() {
     if (name === 'tipo') setForm(prev => ({ ...prev, capacidad: '' }));
   };
 
-  // Cambia el handleSubmit para mostrar el mensaje bonito
+  // Cambia el handleSubmit para usar los nuevos campos
   const handleSubmit = async e => {
     e.preventDefault();
     setLoading(true);
@@ -150,7 +203,6 @@ export default function Page() {
     }
 
     const solicitudes = Array.from({ length: Number(unidades) }).map(() => ({
-      unidad_de_negocio,
       tipo,
       capacidad,
       unidades_necesarias: 1,
@@ -158,6 +210,7 @@ export default function Page() {
       fecha_hasta: fechaHasta,
       observaciones,
       correo_creador: userEmail,
+      unidad_de_negocio: unidad_de_negocio || null,
     }));
 
     const { error } = await supabase.from('solicitudes_equipos').insert(solicitudes);
@@ -187,22 +240,22 @@ export default function Page() {
     router.push('/login');
   };
 
-  // Modal de confirmación para eliminar
-  const handleEliminar = (id, equipo_asignado) => {
+  // Modal de confirmación para eliminar (cambiar id → id_solicitud)
+  const handleEliminar = (id_solicitud, equipo_asignado) => {
     if (equipo_asignado) {
       alert('No se puede eliminar: ya tiene equipo asignado. Solicitar a taller.');
       return;
     }
-    setModalEliminar({ open: true, id, equipo_asignado });
+    setModalEliminar({ open: true, id: id_solicitud, equipo_asignado });
   };
 
   const confirmarEliminar = async () => {
     setEliminarLoading(modalEliminar.id);
-    const { error } = await supabase.from('solicitudes_equipos').delete().eq('id', modalEliminar.id);
+    const { error } = await supabase.from('solicitudes_equipos').delete().eq('id_solicitud', modalEliminar.id);
     setEliminarLoading(null);
     setModalEliminar({ open: false, id: null, equipo_asignado: null });
     if (!error) {
-      setSolicitudes(solicitudes.filter(s => s.id !== modalEliminar.id));
+      setSolicitudes(solicitudes.filter(s => s.id_solicitud !== modalEliminar.id));
     } else {
       alert('Error al eliminar la solicitud');
     }
@@ -211,7 +264,22 @@ export default function Page() {
   // --- FILTRADO ---
   const solicitudesFiltradas = solicitudes.filter(s => {
     const coincideTipo = !filtroTipo || s.tipo === filtroTipo;
-    const coincideMes = s.fecha_desde && s.fecha_desde.startsWith(filtroMes);
+
+    // Si no hay filtro de mes, mostrar todas
+    if (!filtroMes) return coincideTipo;
+
+    if (!s.fecha_desde || !s.fecha_hasta) return false;
+    const desde = new Date(s.fecha_desde);
+    const hasta = new Date(s.fecha_hasta);
+
+    // Primer y último día del mes filtrado
+    const [anio, mes] = filtroMes.split('-');
+    const primerDiaMes = new Date(Number(anio), Number(mes) - 1, 1);
+    const ultimoDiaMes = new Date(Number(anio), Number(mes), 0);
+
+    // Hay cruce si el rango de la solicitud se solapa con el mes filtrado
+    const coincideMes = hasta >= primerDiaMes && desde <= ultimoDiaMes;
+
     return coincideTipo && coincideMes;
   });
 
@@ -249,6 +317,31 @@ export default function Page() {
     }
     validarSolicitante();
   }, [router]);
+
+  // Traer asignaciones del usuario
+  useEffect(() => {
+    async function fetchAsignaciones() {
+      // Solo traemos asignaciones de las solicitudes de este usuario
+      const { data, error } = await supabase
+        .from('asignaciones')
+        .select('*');
+      if (!error) setAsignaciones(data);
+    }
+    fetchAsignaciones();
+  }, []);
+
+  // --- FUNCIÓN PARA ABRIR EL MODAL Y TRAER MOVIMIENTOS ---
+  async function abrirHistorialAsignaciones(idSolicitud) {
+    const { data, error } = await supabase
+      .from('asignaciones')
+      .select('*')
+      .eq('id_solicitud', idSolicitud)
+      .order('fecha_inicio_asignacion', { ascending: true });
+    if (!error) {
+      setHistorialMovimientos(data);
+      setModalHistorialOpen(true);
+    }
+  }
 
   if (checkingAccess) {
     return (
@@ -467,7 +560,7 @@ export default function Page() {
         </form>
       </div>
       {/* Lista de solicitudes a la derecha */}
-      <div className="w-full max-w-3xl mt-8 md:mt-28 md:ml-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 overflow-x-auto">
+      <div className="w-full max-w-6xl mt-8 md:mt-28 md:ml-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
         <h2 className="text-xl font-bold mb-4 text-gray-700 dark:text-gray-200 text-center">
           Mis solicitudes
         </h2>
@@ -500,9 +593,22 @@ export default function Page() {
           <p className="text-center text-gray-500">No tienes solicitudes registradas.</p>
         ) : (
           <>
-            <table className="min-w-full text-sm text-left">
+            <table className="min-w-full text-sm text-left table-fixed">
+              <colgroup>
+                <col style={{ width: '5%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '10%' }} />
+              </colgroup>
               <thead>
                 <tr className="bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100">
+                  <th className="px-2 py-2">ID</th>
                   <th className="px-2 py-2">Tipo</th>
                   <th className="px-2 py-2">Capacidad</th>
                   <th className="px-2 py-2">Unidades</th>
@@ -511,57 +617,80 @@ export default function Page() {
                   <th className="px-2 py-2">Obs.</th>
                   <th className="px-2 py-2">Equipo asignado</th>
                   <th className="px-2 py-2">Acción</th>
+                  <th className="px-2 py-2">Seguimiento</th>
                 </tr>
               </thead>
               <tbody>
-                {solicitudesPagina.map(s => (
-                  <tr key={s.id} className="border-b last:border-b-0 hover:bg-gray-100 dark:hover:bg-gray-800">
-                    <td className="px-2 py-1">{s.tipo}</td>
-                    <td className="px-2 py-1">{s.capacidad}</td>
-                    <td className="px-2 py-1">{s.unidades_necesarias}</td>
-                    <td className="px-2 py-1">{formatearFechaArg(s.fecha_desde)}</td>
-                    <td className="px-2 py-1">{formatearFechaArg(s.fecha_hasta)}</td>
-                    <td className="px-2 py-1">{s.observaciones || '-'}</td>
-                    <td className="px-2 py-1">
-                      {s.equipo_asignado ? (
-                        <span className="text-green-700 dark:text-green-400 font-semibold text-xs">
-                          {s.equipo_asignado}
-                        </span>
-                      ) : (
-                        <span className="text-yellow-700 dark:text-yellow-400 font-semibold text-xs">
-                          Sin asignar
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-1">
-                      {s.equipo_asignado ? (
-                        <div className="relative group inline-block">
-                          <button
-                            disabled
-                            className="px-3 py-1 rounded text-xs font-semibold shadow bg-gray-300 text-gray-500 cursor-not-allowed"
-                          >
-                            No se puede eliminar
-                          </button>
-                          <div
-                            className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 bg-red-600 text-white text-xs rounded px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20"
-                            style={{ bottom: '-2.5rem', whiteSpace: 'normal' }}
-                          >
-                            No puede eliminar: ya tiene equipo asignado. Solicitar a taller.
+                {solicitudesPagina.map(s => {
+                  // Buscar el último equipo asignado por fecha_inicio_asignacion
+                  // Debes tener el array de asignaciones disponible en este componente
+                  // Si no lo tienes, deberás traerlo con un fetch similar a como traes las solicitudes
+                  const asignacionesSolicitud = (asignaciones || []).filter(a => a.id_solicitud === s.id_solicitud);
+                  let ultimoEquipo = null;
+                  if (asignacionesSolicitud.length > 0) {
+                    // Ordena por fecha_inicio_asignacion descendente y toma el primero
+                    asignacionesSolicitud.sort((a, b) => new Date(b.fecha_inicio_asignacion) - new Date(a.fecha_inicio_asignacion));
+                    ultimoEquipo = asignacionesSolicitud[0].codigo_equipo;
+                  }
+
+                  return (
+                    <tr key={s.id_solicitud} className="border-b last:border-b-0 hover:bg-gray-100 dark:hover:bg-gray-800">
+                      <td className="px-2 py-1">{s.id_solicitud}</td>
+                      <td className="px-2 py-1">{s.tipo}</td>
+                      <td className="px-2 py-1">{s.capacidad}</td>
+                      <td className="px-2 py-1">{s.unidades_necesarias}</td>
+                      <td className="px-2 py-1">{formatearFechaArg(s.fecha_desde)}</td>
+                      <td className="px-2 py-1">{formatearFechaArg(s.fecha_hasta)}</td>
+                      <td className="px-2 py-1">{s.observaciones || '-'}</td>
+                      <td className="px-2 py-1">
+                        {ultimoEquipo ? (
+                          <span className="text-green-700 dark:text-green-400 font-semibold text-xs">
+                            {ultimoEquipo}
+                          </span>
+                        ) : (
+                          <span className="text-yellow-700 dark:text-yellow-400 font-semibold text-xs">
+                            Sin asignar
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1">
+                        {ultimoEquipo ? (
+                          <div className="relative group inline-block">
+                            <button
+                              disabled
+                              className="px-3 py-1 rounded text-xs font-semibold shadow bg-gray-300 text-gray-500 cursor-not-allowed"
+                            >
+                              No se puede eliminar
+                            </button>
+                            <div
+                              className="absolute left-1/2 -translate-x-1/2 mt-2 w-56 bg-red-600 text-white text-xs rounded px-3 py-2 shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20"
+                              style={{ bottom: '-2.5rem', whiteSpace: 'normal' }}
+                            >
+                              No puede eliminar: ya tiene equipo asignado. Solicitar a taller.
+                            </div>
                           </div>
-                        </div>
-                      ) : (
+                        ) : (
+                          <button
+                            onClick={() => handleEliminar(s.id_solicitud, ultimoEquipo)}
+                            disabled={eliminarLoading === s.id_solicitud}
+                            className={`px-3 py-1 rounded text-xs font-semibold shadow transition
+                              bg-red-500 text-white hover:bg-red-600`}
+                          >
+                            {eliminarLoading === s.id_solicitud ? 'Eliminando...' : 'Eliminar'}
+                          </button>
+                        )}
+                      </td>
+                      <td className="px-2 py-1">
                         <button
-                          onClick={() => handleEliminar(s.id, s.equipo_asignado)}
-                          disabled={eliminarLoading === s.id}
-                          className={`px-3 py-1 rounded text-xs font-semibold shadow transition
-                            bg-red-500 text-white hover:bg-red-600`}
+                          className="px-3 py-1 rounded text-xs font-semibold shadow bg-blue-500 text-white hover:bg-blue-600 transition"
+                          onClick={() => abrirHistorialAsignaciones(s.id_solicitud)}
                         >
-                          {eliminarLoading === s.id ? 'Eliminando...' : 'Eliminar'}
+                          Ver historial
                         </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {/* Paginador */}
@@ -612,6 +741,12 @@ export default function Page() {
           </div>
         </div>
       )}
+      <ModalHistorial
+        open={modalHistorialOpen}
+        onClose={() => setModalHistorialOpen(false)}
+        movimientos={historialMovimientos}
+        formatearFechaArg={formatearFechaArg}
+      />
     </main>
   );
 }

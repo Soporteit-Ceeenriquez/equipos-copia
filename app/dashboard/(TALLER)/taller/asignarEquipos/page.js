@@ -2,319 +2,585 @@
 
 import { supabase } from '@/utils/supabase';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-function formatearFechaArg(fecha) {
-  if (!fecha) return '-';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-    const [anio, mes, dia] = fecha.split('-');
-    return `${dia}/${mes}/${anio}`;
-  }
-  const d = new Date(fecha);
-  const dia = String(d.getDate()).padStart(2, '0');
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const anio = d.getFullYear();
-  return `${dia}/${mes}/${anio}`;
+// --- COMPONENTES REUTILIZABLES ---
+function DetalleSolicitud({ solicitud, formatearFechaArg }) {
+  if (!solicitud) return null;
+  return (
+    <div className="mt-4 p-4 rounded bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 shadow">
+      <div className="mb-2">
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Unidad de negocio: </span>
+        <span className="text-gray-800 dark:text-gray-200">{solicitud.unidad_de_negocio}</span>
+      </div>
+      <div className="mb-2">
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Tipo de equipo solicitado: </span>
+        <span className="text-gray-800 dark:text-gray-200">{solicitud.tipo}</span>
+      </div>
+      <div className="mb-2">
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Capacidad informada: </span>
+        <span className="text-gray-800 dark:text-gray-200">{solicitud.capacidad}</span>
+      </div>
+      <div className="mb-2">
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Desde - Hasta: </span>
+        <span className="text-gray-800 dark:text-gray-200">
+          {formatearFechaArg(solicitud.fecha_desde)} - {formatearFechaArg(solicitud.fecha_hasta)}
+        </span>
+      </div>
+      <div>
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Observaciones: </span>
+        <span className="text-gray-800 dark:text-gray-200">
+          {solicitud.observaciones || <span className="italic text-gray-400">Sin observaciones</span>}
+        </span>
+      </div>
+    </div>
+  );
 }
 
-// Utilidad para mes actual en formato YYYY-MM
-function getMesActual() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+function DetalleAsignacion({ asignacion, solicitud, formatearFechaArg }) {
+  if (!asignacion || !solicitud) return null;
+
+  // Criterio: si la asignación no tiene fecha_fin_asignacion, mostrar la fecha_hasta de la solicitud
+  const fechaHastaMostrar = asignacion.fecha_fin_asignacion
+    ? asignacion.fecha_fin_asignacion
+    : solicitud.fecha_hasta;
+
+  return (
+    <div className="mt-4 p-4 rounded bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 shadow">
+      <div className="mb-2">
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Unidad de negocio: </span>
+        <span className="text-gray-800 dark:text-gray-200">{solicitud.unidad_de_negocio}</span>
+      </div>
+      <div className="mb-2">
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Tipo de equipo solicitado: </span>
+        <span className="text-gray-800 dark:text-gray-200">{solicitud.tipo}</span>
+      </div>
+      <div className="mb-2">
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Capacidad informada: </span>
+        <span className="text-gray-800 dark:text-gray-200">{solicitud.capacidad}</span>
+      </div>
+      <div className="mb-2">
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Desde - Hasta: </span>
+        <span className="text-gray-800 dark:text-gray-200">
+          {formatearFechaArg(asignacion.fecha_inicio_asignacion)} - {formatearFechaArg(fechaHastaMostrar)}
+        </span>
+      </div>
+      <div>
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Observaciones: </span>
+        <span className="text-gray-800 dark:text-gray-200">
+          {solicitud.observaciones || <span className="italic text-gray-400">Sin observaciones</span>}
+        </span>
+      </div>
+      <div className="mt-2">
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Equipo asignado actual: </span>
+        <span className="text-gray-800 dark:text-gray-200">{asignacion.codigo_equipo}</span>
+      </div>
+      <div>
+        <span className="font-semibold text-gray-700 dark:text-gray-100">Fecha de asignación actual: </span>
+        <span className="text-gray-800 dark:text-gray-200">{formatearFechaArg(asignacion.fecha_inicio_asignacion)}</span>
+      </div>
+    </div>
+  );
 }
 
-// Utilidad para saber si un rango de fechas solapa con un mes
-function rangoSolapaConMes(fechaDesde, fechaHasta, filtroMes) {
-  // filtroMes: 'YYYY-MM'
-  const [anio, mes] = filtroMes.split('-');
-  const inicioMes = new Date(`${anio}-${mes}-01`);
-  const finMes = new Date(inicioMes);
-  finMes.setMonth(finMes.getMonth() + 1);
-  finMes.setDate(0); // último día del mes
+function ModalRetiroEquipo({ open, onClose, onConfirm, fechaMin, fechaMax }) {
+  const [fechaRetiro, setFechaRetiro] = useState('');
+  const [touched, setTouched] = useState(false);
 
-  // Normaliza fechas (soporta dd/mm/yyyy y yyyy-mm-dd)
-  function parseFecha(f) {
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(f)) {
-      const [d, m, y] = f.split('/');
-      return new Date(`${y}-${m}-${d}`);
-    }
-    return new Date(f);
-  }
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{
+        background: 'rgba(0,0,0,0.60)',
+        backdropFilter: 'blur(6px)'
+      }}
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-sm relative">
+        <button
+          className="absolute top-2 right-2 text-xl px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-full font-bold transition"
+          onClick={onClose}
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+        <h3 className="text-lg font-bold mb-4 text-red-700 dark:text-red-200">Retirar equipo de la solicitud</h3>
+        <label className="font-semibold mb-2 block">Fecha de retiro</label>
+        <input
+          type="date"
+          className="p-2 rounded border w-full"
+          value={fechaRetiro}
+          min={fechaMin}
+          max={fechaMax}
+          onChange={e => {
+            setFechaRetiro(e.target.value);
+            setTouched(true);
+          }}
+          onBlur={() => setTouched(true)}
+        />
+        {touched && !fechaRetiro && (
+          <span className="text-xs text-red-600 mt-1 block">La fecha de retiro es obligatoria.</span>
+        )}
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            className="px-4 py-2 rounded bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold"
+            onClick={onClose}
+          >
+            Cancelar
+          </button>
+          <button
+            className="px-4 py-2 rounded bg-red-600 text-white font-semibold hover:bg-red-700 transition"
+            onClick={() => fechaRetiro && onConfirm(fechaRetiro)}
+            disabled={!fechaRetiro}
+          >
+            Quitar equipo
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const desde = parseFecha(fechaDesde);
-  const hasta = parseFecha(fechaHasta);
+function ModalEditarFecha({ open, onClose, fechaActual, fechaMin, fechaMax, onConfirm }) {
+  const [nuevaFecha, setNuevaFecha] = useState(fechaActual || '');
+  const [touched, setTouched] = useState(false);
 
-  // ¿Hay solapamiento?
-  return desde <= finMes && hasta >= inicioMes;
+  useEffect(() => {
+    setNuevaFecha(fechaActual || '');
+    setTouched(false);
+  }, [open, fechaActual]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{
+        background: 'rgba(0,0,0,0.60)',
+        backdropFilter: 'blur(6px)'
+      }}
+    >
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-sm relative">
+        <button
+          className="absolute top-2 right-2 text-xl px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-full font-bold transition"
+          onClick={onClose}
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
+        <h3 className="text-lg font-bold mb-4 text-blue-700 dark:text-blue-200">Editar fecha de inicio</h3>
+        <label className="font-semibold mb-2 block">Nueva fecha de inicio</label>
+        <input
+          type="date"
+          className="p-2 rounded border w-full"
+          value={nuevaFecha}
+          min={fechaMin}
+          max={fechaMax}
+          onChange={e => {
+            setNuevaFecha(e.target.value);
+            setTouched(true);
+          }}
+          onBlur={() => setTouched(true)}
+        />
+        {touched && !nuevaFecha && (
+          <span className="text-xs text-red-600 mt-1 block">La fecha es obligatoria.</span>
+        )}
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            className="px-4 py-2 rounded bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-semibold"
+            onClick={onClose}
+          >
+            Cancelar
+          </button>
+          <button
+            className="px-4 py-2 rounded bg-blue-700 text-white font-semibold hover:bg-blue-800 transition"
+            onClick={() => nuevaFecha && onConfirm(nuevaFecha)}
+            disabled={!nuevaFecha}
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function AsignarEquiposPage() {
   const router = useRouter();
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [solicitudes, setSolicitudes] = useState([]);
-  const [asignandoId, setAsignandoId] = useState(null);
-  const [equiposDisponibles, setEquiposDisponibles] = useState([]);
-  const [showEquiposModal, setShowEquiposModal] = useState(false);
-  const [solicitudSeleccionada, setSolicitudSeleccionada] = useState(null);
-  const [mensaje, setMensaje] = useState('');
-  const [showFechaHastaModal, setShowFechaHastaModal] = useState(false);
-  const [nuevoEquipo, setNuevoEquipo] = useState(null);
-  const [quitandoAsignacion, setQuitandoAsignacion] = useState(false);
-  const fechaHastaRef = useRef();
-  const [equiposAsignados, setEquiposAsignados] = useState([]);
-  const [asignaciones, setAsignaciones] = useState([]);
-  const [showReiniciarModal, setShowReiniciarModal] = useState(false);
-  const [reiniciarId, setReiniciarId] = useState(null);
-  const [showEliminarAsignacionModal, setShowEliminarAsignacionModal] = useState(false);
-  const [asignacionAEliminar, setAsignacionAEliminar] = useState(null);
-
-  // Filtros
-  const [filtroUnidad, setFiltroUnidad] = useState('');
-  const [filtroMes, setFiltroMes] = useState('');
-  const [filtroAsignado, setFiltroAsignado] = useState('todos');
-
-  // Eliminar solicitud
-  const [showEliminarSolicitudModal, setShowEliminarSolicitudModal] = useState(false);
-  const [solicitudAEliminar, setSolicitudAEliminar] = useState(null);
-
-  // Paginación
-  const [pagina, setPagina] = useState(1);
-  const [paginaModal, setPaginaModal] = useState(1); // <-- al inicio del componente
-  const [paginaEquipos, setPaginaEquipos] = useState(1); // <-- al inicio del componente
-  const registrosPorPagina = 6;
-
-  // Al inicio del componente:
   const [equipos, setEquipos] = useState([]);
+  const [asignaciones, setAsignaciones] = useState([]);
+  const [equiposDisponibles, setEquiposDisponibles] = useState([]);
+  const [solicitudSeleccionada, setSolicitudSeleccionada] = useState(null);
+  const [equipoSeleccionado, setEquipoSeleccionado] = useState(null);
+  const [asignacionSeleccionada, setAsignacionSeleccionada] = useState(null);
+  const [equiposCompatibles, setEquiposCompatibles] = useState([]);
+  const [motivoReemplazo, setMotivoReemplazo] = useState('');
+  const [mensaje, setMensaje] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [unidadFiltro, setUnidadFiltro] = useState('');
+  const [fechaReemplazo, setFechaReemplazo] = useState('');
+  const [fechaReemplazoTouched, setFechaReemplazoTouched] = useState(false);
+  const [tab, setTab] = useState('asignar');
+  const [modalRetiroOpen, setModalRetiroOpen] = useState(false);
+  const [modalFechaOpen, setModalFechaOpen] = useState(false);
+  const [solicitudEditando, setSolicitudEditando] = useState(null);
 
+  // --- VALIDACIÓN DE ACCESO ---
   useEffect(() => {
     async function validarTaller() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) {
-        router.replace('/login');
-        return;
-      }
+      if (!token) return router.replace('/login');
       const res = await fetch('/api/validate-taller', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       });
       const data = await res.json();
-      if (!data.isTaller) {
-        router.replace('/dashboard');
-        return;
-      }
+      if (!data.isTaller) return router.replace('/dashboard');
       setCheckingAccess(false);
     }
     validarTaller();
   }, [router]);
 
+  // --- FETCH DATA ---
   useEffect(() => {
-    if (!checkingAccess) {
-      fetchSolicitudes();
-      fetchEquiposAsignados();
-      fetchAsignaciones();
-    }
-  }, [checkingAccess]);
-
-  // Al cargar el componente, trae todos los equipos:
-  useEffect(() => {
-    async function fetchEquipos() {
-      const { data } = await supabase
-        .from('equipos')
-        .select('codigo, tipo_de_equipos');
-      setEquipos(data || []);
-    }
+    fetchSolicitudes();
     fetchEquipos();
+    fetchAsignaciones();
   }, []);
 
+  useEffect(() => {
+    if (solicitudSeleccionada) filtrarEquiposDisponibles(solicitudSeleccionada);
+  }, [solicitudSeleccionada, equipos, asignaciones]);
+
+  useEffect(() => {
+    if (asignacionSeleccionada) filtrarEquiposCompatibles(asignacionSeleccionada);
+  }, [asignacionSeleccionada, equipos, asignaciones]);
+
+  useEffect(() => {
+    if (
+      solicitudSeleccionada &&
+      solicitudes.length > 0 &&
+      !solicitudes.some(s => s.id_solicitud === solicitudSeleccionada.id_solicitud)
+    ) {
+      setSolicitudSeleccionada(null);
+      setEquipoSeleccionado(null);
+    } else if (
+      solicitudSeleccionada &&
+      solicitudes.length > 0
+    ) {
+      const actual = solicitudes.find(s => s.id_solicitud === solicitudSeleccionada.id_solicitud);
+      if (actual && actual !== solicitudSeleccionada) setSolicitudSeleccionada(actual);
+    }
+  }, [solicitudes]);
+
   async function fetchSolicitudes() {
-    const { data, error } = await supabase
-      .from('solicitudes_equipos')
-      .select('id, unidad_de_negocio, tipo, capacidad, fecha_desde, fecha_hasta, observaciones, equipo_asignado, editadoportaller, fechadesdeeditada');
-    if (!error) setSolicitudes(data || []);
+    const { data, error } = await supabase.from('solicitudes_equipos').select('*');
+    if (!error) setSolicitudes(data);
   }
-
-  async function fetchEquiposAsignados() {
-    const { data, error } = await supabase
-      .from('asignaciones_por_unidad_de_negocio')
-      .select('equipo, unidad_de_negocio')
-      .not('asignado_hasta', 'is', null);
-    if (!error) setEquiposAsignados(data || []);
+  async function fetchEquipos() {
+    const { data, error } = await supabase.from('equipos').select('*');
+    if (!error) setEquipos(data);
   }
-
   async function fetchAsignaciones() {
-    const { data, error } = await supabase
-      .from('asignaciones_por_unidad_de_negocio')
-      .select('equipo, unidad_de_negocio, asignado_desde, asignado_hasta');
-    if (!error) setAsignaciones(data || []);
+    const { data, error } = await supabase.from('asignaciones').select('*');
+    if (!error) setAsignaciones(data);
   }
 
-  async function handleAsignarEquipo(solicitud) {
-    setAsignandoId(solicitud.id);
-    setSolicitudSeleccionada(solicitud);
-    setPaginaModal(1);
-    setPaginaEquipos(1); // <-- resetea aquí
-
-    const { data: equipos } = await supabase
-      .from('equipos')
-      .select('codigo, tipo_de_equipos, capacidad_informada, detalle_planilla_mpt, detalles');
-
-    const equiposDelTipo = (equipos || []).filter(eq => eq.tipo_de_equipos === solicitud.tipo);
-
-    const { data: asignaciones } = await supabase
-      .from('asignaciones_por_unidad_de_negocio')
-      .select('equipo, asignado_desde, asignado_hasta');
-
-    const desdeValidar = solicitud.editadoportaller && solicitud.fechadesdeeditada
-      ? solicitud.fechadesdeeditada
-      : solicitud.fecha_desde;
-    const hastaValidar = solicitud.fecha_hasta;
-
-    function fechasSeSolapan(desdeA, hastaA, desdeB, hastaB) {
-      return (
-        new Date(desdeA) <= new Date(hastaB) &&
-        new Date(desdeB) <= new Date(hastaA)
-      );
-    }
-
-    const disponibles = equiposDelTipo.filter(eq => {
-      const asignadoEnPeriodo = (asignaciones || []).some(asig =>
-        asig.equipo === eq.codigo &&
-        fechasSeSolapan(
-          asig.asignado_desde,
-          asig.asignado_hasta,
-          desdeValidar,
-          hastaValidar
-        )
-      );
-      if (solicitud.equipo_asignado && eq.codigo === solicitud.equipo_asignado) return false;
-      return !asignadoEnPeriodo;
-    });
-
-    setEquiposDisponibles(disponibles);
-    setShowEquiposModal(true);
-    setAsignandoId(null);
-  }
-
-  async function asignarEquipoAlaSolicitud(equipoCodigo) {
-    if (!solicitudSeleccionada) return;
-    setMensaje('');
-
-    if (solicitudSeleccionada.equipo_asignado) {
-      setNuevoEquipo(equipoCodigo);
-      setShowFechaHastaModal(true);
-      return;
-    }
-
-    const desdeAsignar = solicitudSeleccionada.editadoportaller && solicitudSeleccionada.fechadesdeeditada
-      ? solicitudSeleccionada.fechadesdeeditada
-      : solicitudSeleccionada.fecha_desde;
-
-    await supabase
-      .from('asignaciones_por_unidad_de_negocio')
-      .insert([{
-        equipo: equipoCodigo,
-        asignado_desde: desdeAsignar,
-        asignado_hasta: solicitudSeleccionada.fecha_hasta,
-        fecha_de_asignacion: new Date().toISOString(),
-        unidad_de_negocio: solicitudSeleccionada.unidad_de_negocio,
-      }]);
-
-    const { error } = await supabase
-      .from('solicitudes_equipos')
-      .update({
-        equipo_asignado: equipoCodigo,
-        fecha_asignacion: new Date().toISOString(),
-      })
-      .eq('id', solicitudSeleccionada.id);
-
-    if (!error) {
-      setMensaje('Equipo asignado correctamente.');
-      setShowEquiposModal(false);
-      fetchSolicitudes();
-      fetchEquiposAsignados(); // <--- agrega esta línea
-      fetchAsignaciones();     // <--- y esta si quieres refrescar también las asignaciones
-    } else {
-      setMensaje('Error al asignar equipo.');
-    }
-  }
-
-  async function confirmarReasignacion() {
-    const fechaHasta = fechaHastaRef.current.value;
-    if (!fechaHasta || !/^\d{4}-\d{2}-\d{2}$/.test(fechaHasta)) {
-      setMensaje('Por favor, selecciona una fecha válida.');
-      return;
-    }
-
-    await supabase
-      .from('asignaciones_por_unidad_de_negocio')
-      .update({ asignado_hasta: fechaHasta })
-      .eq('equipo', solicitudSeleccionada.equipo_asignado)
-      .eq('asignado_desde', solicitudSeleccionada.fecha_desde);
-
-    await supabase
-      .from('asignaciones_por_unidad_de_negocio')
-      .insert([{
-        equipo: nuevoEquipo,
-        asignado_desde: fechaHasta,
-        asignado_hasta: solicitudSeleccionada.fecha_hasta,
-        fecha_de_asignacion: new Date().toISOString(),
-        unidad_de_negocio: solicitudSeleccionada.unidad_de_negocio,
-      }]);
-
-    const { error } = await supabase
-      .from('solicitudes_equipos')
-      .update({
-        equipo_asignado: nuevoEquipo,
-        fecha_asignacion: new Date().toISOString(),
-      })
-      .eq('id', solicitudSeleccionada.id);
-
-    setShowFechaHastaModal(false);
-    setNuevoEquipo(null);
-
-    if (!error) {
-      setMensaje('Equipo reasignado correctamente.');
-      setShowEquiposModal(false);
-      fetchSolicitudes();
-    } else {
-      setMensaje('Error al reasignar equipo.');
-    }
-  }
-
-  async function reiniciarSolicitud(id) {
-    await supabase
-      .from('solicitudes_equipos')
-      .update({
-        editadoportaller: false,
-        fechadesdeeditada: null,
-      })
-      .eq('id', id);
-    setShowReiniciarModal(false);
-    setReiniciarId(null);
-    setMensaje('Solicitud reiniciada correctamente.');
-    fetchSolicitudes();
-  }
-
-  // Filtrado
-  const solicitudesFiltradas = solicitudes.filter(s => {
-    let pasa = true;
-    if (filtroUnidad && s.unidad_de_negocio !== filtroUnidad) pasa = false;
-    if (filtroMes) {
-      if (!rangoSolapaConMes(s.fecha_desde, s.fecha_hasta, filtroMes)) pasa = false;
-    }
-    if (filtroAsignado === 'si' && !s.equipo_asignado) pasa = false;
-    if (filtroAsignado === 'no' && s.equipo_asignado) pasa = false;
-    return pasa;
-  });
-
-  // Paginación de resultados
-  const totalPaginas = Math.ceil(solicitudesFiltradas.length / registrosPorPagina);
-  const solicitudesPagina = solicitudesFiltradas.slice(
-    (pagina - 1) * registrosPorPagina,
-    pagina * registrosPorPagina
+  // --- FILTROS Y DERIVADOS ---
+  const unidadesNegocio = useMemo(
+    () => Array.from(new Set(solicitudes.map(s => s.unidad_de_negocio))).filter(Boolean),
+    [solicitudes]
   );
+
+  const solicitudesFiltradas = useMemo(
+    () => unidadFiltro
+      ? solicitudes.filter(s => s.unidad_de_negocio === unidadFiltro)
+      : solicitudes,
+    [solicitudes, unidadFiltro]
+  );
+
+  const asignacionesFiltradas = useMemo(
+    () => unidadFiltro
+      ? asignaciones.filter(a => {
+          const solicitud = solicitudes.find(s => s.id_solicitud === a.id_solicitud);
+          return solicitud && solicitud.unidad_de_negocio === unidadFiltro;
+        })
+      : asignaciones,
+    [asignaciones, solicitudes, unidadFiltro]
+  );
+
+  // --- SOLO SOLICITUDES SIN EQUIPO ASIGNADO (NINGUNA ASIGNACIÓN ACTIVA EN LA FECHA ACTUAL) ---
+  const hoy = new Date();
+
+  const solicitudesSinAsignar = useMemo(
+    () => solicitudesFiltradas.filter(s => {
+      // Si la solicitud NO tiene ninguna asignación en la tabla, se muestra como activa
+      const tieneAsignacion = asignaciones.some(a => a.id_solicitud === s.id_solicitud);
+      return !tieneAsignacion;
+    }),
+    [solicitudesFiltradas, asignaciones]
+  );
+
+  // --- SOLO ÚLTIMA ASIGNACIÓN POR SOLICITUD (PARA EL MENÚ DE REEMPLAZO) ---
+  const asignacionesUltimas = useMemo(() => {
+    // Agrupa por id_solicitud y selecciona la asignación con la fecha_inicio_asignacion más reciente
+    const porSolicitud = {};
+    for (const asg of asignacionesFiltradas) {
+      const actual = porSolicitud[asg.id_solicitud];
+      const inicio = new Date(asg.fecha_inicio_asignacion);
+      if (
+        !actual ||
+        inicio > new Date(actual.fecha_inicio_asignacion)
+      ) {
+        porSolicitud[asg.id_solicitud] = asg;
+      }
+    }
+    return Object.values(porSolicitud);
+  }, [asignacionesFiltradas]);
+
+  // --- FILTRAR EQUIPOS DISPONIBLES ---
+  function filtrarEquiposDisponibles(solicitud) {
+    const equiposFiltrados = equipos.filter(eq => eq.tipo_de_equipos === solicitud.tipo);
+    const desde = new Date(solicitud.fecha_desde);
+    const hasta = new Date(solicitud.fecha_hasta);
+
+    const disponibles = equiposFiltrados.filter(eq => {
+      const asignacionesEquipo = asignaciones.filter(asg => asg.codigo_equipo === eq.codigo);
+      // El equipo está disponible si NO tiene ninguna asignación que se cruce con el rango solicitado
+      return !asignacionesEquipo.some(asg => {
+        const asigInicio = new Date(asg.fecha_inicio_asignacion);
+        const asigFin = asg.fecha_fin_asignacion ? new Date(asg.fecha_fin_asignacion) : null;
+        // Si la asignación termina antes o justo en el "desde", no hay conflicto
+        if (asigFin && asigFin <= desde) return false;
+        // Si la asignación empieza después o justo en el "hasta", no hay conflicto
+        if (asigInicio >= hasta) return false;
+        // Si se solapan, hay conflicto
+        return true;
+      });
+    });
+    setEquiposDisponibles(disponibles);
+  }
+
+  // --- FILTRAR EQUIPOS COMPATIBLES ---
+  function filtrarEquiposCompatibles(asignacion) {
+    const solicitud = solicitudes.find(s => s.id_solicitud === asignacion.id_solicitud);
+    if (!solicitud) return setEquiposCompatibles([]);
+    // Si la asignación aún no tiene fecha_inicio_asignacion, usar la fecha_desde de la solicitud
+    const minDesde = asignacion.fecha_inicio_asignacion
+      ? new Date(asignacion.fecha_inicio_asignacion)
+      : new Date(solicitud.fecha_desde);
+    const hasta = new Date(solicitud.fecha_hasta);
+
+    // Si el usuario seleccionó una fecha válida, úsala, si no, usa minDesde
+    const desde = fechaReemplazo && new Date(fechaReemplazo) >= minDesde ? new Date(fechaReemplazo) : minDesde;
+
+    const compatibles = equipos.filter(
+      eq => eq.tipo_de_equipos === solicitud.tipo && eq.codigo !== asignacion.codigo_equipo
+    );
+    const disponibles = compatibles.filter(eq => {
+      const asignacionesEquipo = asignaciones.filter(asg => asg.codigo_equipo === eq.codigo);
+      // El equipo está disponible si NO tiene ninguna asignación que se cruce con el nuevo rango
+      return !asignacionesEquipo.some(asg => {
+        const asigInicio = new Date(asg.fecha_inicio_asignacion);
+        const asigFin = asg.fecha_fin_asignacion ? new Date(asg.fecha_fin_asignacion) : null;
+        // Si la asignación termina antes del nuevo "desde", no hay conflicto
+        if (asigFin && asigFin <= desde) return false;
+        // Si la asignación empieza después del nuevo "hasta", no hay conflicto
+        if (asigInicio >= hasta) return false;
+        // Si se solapan, hay conflicto
+        return true;
+      });
+    });
+    setEquiposCompatibles(disponibles);
+  }
+
+  // --- FORMATEAR FECHA ---
+  function formatearFechaArg(fecha) {
+    if (!fecha) return '-';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      const [anio, mes, dia] = fecha.split('-');
+      return `${dia}/${mes}/${anio}`;
+    }
+    const d = new Date(fecha);
+    const dia = String(d.getDate()).padStart(2, '0');
+    const mes = String(d.getMonth() + 1).padStart(2, '0');
+    const anio = d.getFullYear();
+    return `${dia}/${mes}/${anio}`;
+  }
+
+  // --- ASIGNAR EQUIPO ---
+  async function handleAsignarEquipo() {
+    if (!solicitudSeleccionada || !equipoSeleccionado) return;
+    setLoading(true);
+    setMensaje('');
+    const yaAsignado = asignaciones.some(
+      asg =>
+        asg.id_solicitud === solicitudSeleccionada.id_solicitud &&
+        asg.codigo_equipo === equipoSeleccionado.codigo &&
+        !asg.fecha_fin_asignacion
+    );
+    if (yaAsignado) {
+      setMensaje('Ya existe una asignación activa para este equipo y solicitud.');
+      setLoading(false);
+      return;
+    }
+    const insertData = {
+      codigo_equipo: equipoSeleccionado.codigo,
+      id_solicitud: solicitudSeleccionada.id_solicitud,
+      fecha_inicio_asignacion: solicitudSeleccionada.fecha_desde,
+      es_reemplazo: false,
+      usuario_que_asigno: 'usuario_actual',
+      fecha_asignacion: new Date().toISOString(),
+    };
+    const { error } = await supabase.from('asignaciones').insert([insertData]);
+    if (error) {
+      setMensaje('Error al asignar equipo: ' + error.message);
+      setLoading(false);
+      return;
+    }
+    await supabase
+      .from('equipos')
+      .update({ unidad_negocio_actual: solicitudSeleccionada.unidad_de_negocio })
+      .eq('codigo', equipoSeleccionado.codigo);
+    setMensaje('Equipo asignado correctamente.');
+    fetchAsignaciones();
+    fetchEquipos();
+    setSolicitudSeleccionada(null);
+    setEquipoSeleccionado(null);
+    setLoading(false);
+  }
+
+  // --- REEMPLAZAR EQUIPO ---
+  async function handleReemplazarEquipo() {
+    if (!asignacionSeleccionada || !equipoSeleccionado || !motivoReemplazo || !fechaReemplazo) return;
+    setLoading(true);
+    setMensaje('');
+    // Cierra la asignación anterior
+    const { error: errorUpdate } = await supabase
+      .from('asignaciones')
+      .update({ fecha_fin_asignacion: fechaReemplazo })
+      .eq('id_asignacion', asignacionSeleccionada.id_asignacion);
+    if (errorUpdate) {
+      setMensaje('Error al cerrar la asignación anterior.');
+      setLoading(false);
+      return;
+    }
+    const solicitud = solicitudes.find(s => s.id_solicitud === asignacionSeleccionada.id_solicitud);
+    // Inserta la nueva asignación
+    const { error } = await supabase.from('asignaciones').insert([{
+      codigo_equipo: equipoSeleccionado.codigo,
+      id_solicitud: asignacionSeleccionada.id_solicitud,
+      fecha_inicio_asignacion: fechaReemplazo,
+      fecha_fin_asignacion: solicitud?.fecha_hasta || null, // <-- SIEMPRE el hasta de la solicitud
+      es_reemplazo: true,
+      id_asignacion_reemplazada: asignacionSeleccionada.id_asignacion,
+      motivo_reemplazo: motivoReemplazo,
+      usuario_que_asigno: 'usuario_actual',
+      fecha_asignacion: new Date().toISOString(),
+    }]);
+    if (!error) {
+      await supabase
+        .from('equipos')
+        .update({ unidad_negocio_actual: solicitud?.unidad_de_negocio || null })
+        .eq('codigo', equipoSeleccionado.codigo);
+      setMensaje('Equipo reemplazado correctamente.');
+      fetchAsignaciones();
+      fetchEquipos();
+      setAsignacionSeleccionada(null);
+      setEquipoSeleccionado(null);
+      setMotivoReemplazo('');
+      setFechaReemplazo('');
+    } else {
+      setMensaje('Error al reemplazar equipo.');
+    }
+    setLoading(false);
+  }
+
+  // --- QUITAR EQUIPO ---
+  async function handleQuitarEquipo(fechaRetiro) {
+    if (!asignacionSeleccionada || !fechaRetiro) return;
+    setLoading(true);
+    setMensaje('');
+    // Cierra la asignación anterior
+    await supabase
+      .from('asignaciones')
+      .update({ fecha_fin_asignacion: fechaRetiro })
+      .eq('id_asignacion', asignacionSeleccionada.id_asignacion);
+
+    // Edita la solicitud: fecha_hasta = fechaRetiro
+    await supabase
+      .from('solicitudes_equipos')
+      .update({ fecha_hasta: fechaRetiro })
+      .eq('id_solicitud', asignacionSeleccionada.id_solicitud);
+
+    // Busca la solicitud original
+    const solicitud = solicitudes.find(s => s.id_solicitud === asignacionSeleccionada.id_solicitud);
+    if (!solicitud) {
+      setMensaje('No se encontró la solicitud original.');
+      setLoading(false);
+      setModalRetiroOpen(false);
+      return;
+    }
+
+    // Crea la nueva solicitud (solo los campos válidos)
+    const nuevaSolicitud = {
+      unidad_de_negocio: solicitud.unidad_de_negocio,
+      tipo: solicitud.tipo,
+      capacidad: solicitud.capacidad,
+      unidades_necesarias: solicitud.unidades_necesarias,
+      fecha_desde: fechaRetiro,
+      fecha_hasta: solicitud.fecha_hasta,
+      observaciones: `Esta solicitud reemplaza a la ${solicitud.id_solicitud}`,
+      correo_creador: solicitud.correo_creador
+    };
+
+    const { error: errorNuevaSolicitud } = await supabase
+      .from('solicitudes_equipos')
+      .insert([nuevaSolicitud]);
+
+    if (errorNuevaSolicitud) {
+      setMensaje('Error al crear la nueva solicitud.');
+      setLoading(false);
+      setModalRetiroOpen(false);
+      return;
+    }
+
+    setMensaje('Equipo retirado y nueva solicitud generada.');
+    fetchSolicitudes();
+    fetchAsignaciones();
+    setAsignacionSeleccionada(null);
+    setEquipoSeleccionado(null);
+    setMotivoReemplazo('');
+    setFechaReemplazo('');
+    setLoading(false);
+    setModalRetiroOpen(false);
+  }
+
+  const handleEditarFechaInicio = async (nuevaFecha) => {
+    if (!solicitudEditando || !nuevaFecha) return;
+    setLoading(true);
+    setMensaje('');
+    const { error } = await supabase
+      .from('solicitudes_equipos')
+      .update({ fecha_desde: nuevaFecha })
+      .eq('id_solicitud', solicitudEditando.id_solicitud);
+    if (error) {
+      setMensaje('Error al actualizar la fecha: ' + error.message);
+    } else {
+      setMensaje('Fecha de inicio actualizada.');
+      fetchSolicitudes();
+    }
+    setModalFechaOpen(false);
+    setSolicitudEditando(null);
+    setLoading(false);
+  };
+
+  // Cerrar sesión
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.replace('/login');
+  }
 
   if (checkingAccess) {
     return (
@@ -327,701 +593,306 @@ export default function AsignarEquiposPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-4">
-      <div className="w-full max-w-7xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 flex flex-col items-center">
-        <div className="w-full flex justify-start mb-4">
-          <button
-            onClick={() => router.push('/dashboard/taller')}
-            className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md text-sm font-semibold shadow hover:bg-gray-300 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 transition"
-          >
-            ← Volver
-          </button>
-        </div>
-        <h1 className="text-3xl font-bold text-blue-700 dark:text-blue-300 mb-2 text-center drop-shadow">
-          Asignar Equipos a Solicitud
-        </h1>
-        <div className="w-20 h-1 bg-blue-600 rounded-full mb-8 mx-auto" />
-        {/* Filtros debajo del título y arriba de la tabla */}
-        <div className="w-full flex flex-wrap gap-4 mb-6 items-end justify-center">
-          <div>
-            <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-200">Unidad de Negocio</label>
-            <select
-              value={filtroUnidad}
-              onChange={e => setFiltroUnidad(e.target.value)}
-              className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100"
-            >
-              <option value="">Todas</option>
-              {Array.from(new Set(solicitudes.map(s => s.unidad_de_negocio).filter(Boolean))).map(u => (
-                <option key={u} value={u}>{u}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-200">Mes</label>
-            <input
-              type="month"
-              value={filtroMes}
-              onChange={e => setFiltroMes(e.target.value)}
-              className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold mb-1 text-gray-700 dark:text-gray-200">¿Asignado?</label>
-            <select
-              value={filtroAsignado}
-              onChange={e => setFiltroAsignado(e.target.value)}
-              className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100"
-            >
-              <option value="todos">Todos</option>
-              <option value="si">Sí</option>
-              <option value="no">No</option>
-            </select>
-          </div>
-        </div>
-        <div className="w-full overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100">
-                <th className="px-2 py-2 text-center">Unidad de Negocio</th>
-                <th className="px-2 py-2 text-center">Tipo</th>
-                <th className="px-2 py-2 text-center">Capacidad</th>
-                <th className="px-2 py-2 text-center">Fecha desde</th>
-                <th className="px-2 py-2 text-center">Fecha hasta</th>
-                <th className="px-2 py-2 text-center">Observaciones</th>
-                <th className="px-2 py-2 text-center">Equipo asignado</th>
-                <th className="px-2 py-2 text-center">Acción</th>
-                <th className="px-2 py-2 text-center">Editado por taller</th>
-                <th className="px-2 py-2 text-center">Fecha de fin - ultima asignación</th>
-                <th className="px-2 py-2 text-center">Reiniciar Ediciones Taller</th>
-                <th className="px-2 py-2 text-center">Eliminar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {solicitudesFiltradas.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    No hay solicitudes para mostrar.
-                  </td>
-                </tr>
-              ) : (
-                solicitudesPagina.map(s => (
-                  <tr key={s.id} className="border-b last:border-b-0 hover:bg-gray-100 dark:hover:bg-gray-900">
-                    <td className="px-2 py-1 text-center">{s.unidad_de_negocio || '-'}</td>
-                    <td className="px-2 py-1 text-center">{s.tipo}</td>
-                    <td className="px-2 py-1 text-center">{s.capacidad}</td>
-                    <td className="px-2 py-1 text-center">{formatearFechaArg(s.fecha_desde)}</td>
-                    <td className="px-2 py-1 text-center">{formatearFechaArg(s.fecha_hasta)}</td>
-                    <td className="px-2 py-1 text-center">{s.observaciones || '-'}</td>
-                    <td className="px-2 py-1 text-center">
-                      {s.equipo_asignado ? (
-                        <span className="text-green-700 dark:text-green-400 font-semibold text-xs">
-                          {s.equipo_asignado}
-                        </span>
-                      ) : (
-                        <span className="text-yellow-700 dark:text-yellow-400 font-semibold text-xs">
-                          Sin asignar
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      <button
-                        onClick={() => handleAsignarEquipo(s)}
-                        disabled={asignandoId === s.id}
-                        className={`px-3 py-1 rounded font-semibold shadow transition text-xs
-                          ${asignandoId === s.id
-                            ? 'bg-gray-400 text-white'
-                            : 'bg-gray-700 dark:bg-gray-600 text-white hover:bg-gray-800 dark:hover:bg-gray-500'
-                          }`}
-                      >
-                        {asignandoId === s.id
-                          ? 'Buscando...'
-                          : s.equipo_asignado
-                            ? 'Editar asignación'
-                            : 'Asignar equipo'}
-                      </button>
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      {s.editadoportaller
-                        ? <span className="text-blue-700 dark:text-blue-300 font-semibold text-xs">Sí</span>
-                        : <span className="text-gray-400 dark:text-gray-500 text-xs">No</span>
-                      }
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      {s.fechadesdeeditada
-                        ? formatearFechaArg(s.fechadesdeeditada)
-                        : <span className="text-gray-400 dark:text-gray-500 text-xs">-</span>
-                      }
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      <button
-                        onClick={() => {
-                          setReiniciarId(s.id);
-                          setShowReiniciarModal(true);
-                        }}
-                        className="px-3 py-1 bg-gray-500 text-white rounded font-semibold shadow hover:bg-gray-600 transition text-xs"
-                      >
-                        Reiniciar
-                      </button>
-                    </td>
-                    <td className="px-2 py-1 text-center">
-                      <button
-                        onClick={() => {
-                          if (s.equipo_asignado) {
-                            setMensaje('Primero quite la asignación del equipo antes de eliminar la solicitud.');
-                            return;
-                          }
-                          setSolicitudAEliminar(s);
-                          setShowEliminarSolicitudModal(true);
-                        }}
-                        className="px-3 py-1 bg-red-600 text-white rounded font-semibold shadow hover:bg-red-700 transition text-xs"
-                      >
-                        Eliminar
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {/* Paginación de resultados */}
-        {totalPaginas > 1 && (
-          <div className="flex flex-wrap justify-center items-center gap-2 mt-4">
-            <button
-              onClick={() => setPagina(1)}
-              disabled={pagina === 1}
-              className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-            >
-              ⏮
-            </button>
-            <button
-              onClick={() => setPagina(p => Math.max(1, p - 1))}
-              disabled={pagina === 1}
-              className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-            >
-              Anterior
-            </button>
-            {/* Números de página */}
-            {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(num => (
-              <button
-                key={num}
-                onClick={() => setPagina(num)}
-                className={`px-3 py-1 rounded font-semibold border ${
-                  pagina === num
-                    ? 'bg-blue-700 text-white border-blue-700'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-blue-200 dark:hover:bg-blue-900'
-                }`}
-              >
-                {num}
-              </button>
-            ))}
-            <button
-              onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
-              disabled={pagina === totalPaginas}
-              className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-            >
-              Siguiente
-            </button>
-            <button
-              onClick={() => setPagina(totalPaginas)}
-              disabled={pagina === totalPaginas}
-              className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-            >
-              ⏭
-            </button>
-            <span className="ml-4 text-sm text-gray-700 dark:text-gray-200">
-              Página {pagina} de {totalPaginas}
-            </span>
-          </div>
-        )}
-        {/* Modal eliminar solicitud */}
-        {showEliminarSolicitudModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8 w-full max-w-md flex flex-col items-center border border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100 text-center">
-                ¿Está seguro que desea eliminar esta solicitud?
-              </h2>
-              <p className="mb-4 text-gray-700 dark:text-gray-200 text-center">
-                Unidad de negocio: <span className="font-semibold">{solicitudAEliminar?.unidad_de_negocio}</span><br />
-                Tipo: <span className="font-semibold">{solicitudAEliminar?.tipo}</span><br />
-                Desde: <span className="font-semibold">{formatearFechaArg(solicitudAEliminar?.fecha_desde)}</span><br />
-                Hasta: <span className="font-semibold">{formatearFechaArg(solicitudAEliminar?.fecha_hasta)}</span>
-              </p>
-              <div className="flex gap-2 w-full">
-                <button
-                  onClick={() => setShowEliminarSolicitudModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={async () => {
-                    await supabase
-                      .from('solicitudes_equipos')
-                      .delete()
-                      .eq('id', solicitudAEliminar.id);
-                    setShowEliminarSolicitudModal(false);
-                    setSolicitudAEliminar(null);
-                    setMensaje('Solicitud eliminada correctamente.');
-                    fetchSolicitudes();
-                  }}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition"
-                >
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+    <main className="min-h-screen flex flex-col gap-10 items-center justify-start bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 p-6">
+      <div className="w-full max-w-4xl flex justify-between items-center mb-2">
+        <button
+          className="px-4 py-2 bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-semibold shadow hover:bg-gray-400 dark:hover:bg-gray-600 transition"
+          onClick={() => router.back()}
+        >
+          ← Volver
+        </button>
+        <button
+          className="px-4 py-2 bg-red-600 text-white rounded font-semibold shadow hover:bg-red-700 transition"
+          onClick={handleLogout}
+        >
+          Cerrar sesión
+        </button>
+      </div>
+      <h1 className="text-2xl font-bold text-blue-700 dark:text-blue-300 mb-4">Gestión de Asignaciones de Equipos</h1>
+      {mensaje && (
+        <div className="mb-4 px-4 py-2 rounded bg-blue-100 text-blue-800 font-semibold shadow">{mensaje}</div>
+      )}
+
+      {/* Tabs */}
+      <div className="w-full max-w-4xl flex mb-6">
+        <button
+          className={`flex-1 py-2 rounded-tl-lg rounded-tr-none rounded-bl-lg rounded-br-none font-semibold transition
+            ${tab === 'asignar'
+              ? 'bg-blue-700 text-white shadow'
+              : 'bg-blue-100 dark:bg-gray-700 text-blue-700 dark:text-gray-200 hover:bg-blue-200 dark:hover:bg-gray-600'}`}
+          onClick={() => setTab('asignar')}
+        >
+          Asignar equipos a solicitudes
+        </button>
+        <button
+          className={`flex-1 py-2 rounded-tr-lg rounded-tl-none rounded-br-lg rounded-bl-none font-semibold transition
+            ${tab === 'reemplazar'
+              ? 'bg-yellow-600 text-white shadow'
+              : 'bg-yellow-100 dark:bg-gray-700 text-yellow-700 dark:text-gray-200 hover:bg-yellow-200 dark:hover:bg-gray-600'}`}
+          onClick={() => setTab('reemplazar')}
+        >
+          Reemplazar equipo asignado
+        </button>
       </div>
 
-      {showEquiposModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8 w-full max-w-4xl flex flex-col items-center border border-gray-200 dark:border-gray-700">
-            <h2 className="text-xl font-bold mb-4 text-gray-800 dark:text-gray-100 text-center">
-              Selecciona un equipo disponible
-            </h2>
-            {equiposDisponibles.length === 0 ? (
-              <p className="text-red-600 dark:text-red-400 text-center mb-4">
-                No hay equipos disponibles para este tipo.
-              </p>
-            ) : (
-              <div className="overflow-x-auto w-full mb-4">
-                {(() => {
-                  const filasPorPaginaEquipos = 5;
-                  const totalPaginasEquipos = Math.ceil(equiposDisponibles.length / filasPorPaginaEquipos);
-                  const equiposPagina = equiposDisponibles.slice(
-                    (paginaEquipos - 1) * filasPorPaginaEquipos,
-                    paginaEquipos * filasPorPaginaEquipos
-                  );
-                  return (
-                    <>
-                      <table className="min-w-[800px] w-full text-sm text-left">
-                        <thead>
-                          <tr className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
-                            <th className="px-2 py-2">Código</th>
-                            <th className="px-2 py-2">Capacidad</th>
-                            <th className="px-2 py-2">Acción</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {equiposPagina.map(eq => (
-                            <tr key={eq.codigo} className="border-b last:border-b-0 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
-                              <td className="px-2 py-1 font-semibold text-gray-700 dark:text-gray-100">{eq.codigo}</td>
-                              <td className="px-2 py-1 text-xs text-gray-600 dark:text-gray-300">
-                                {eq.capacidad_informada || '-'}
-                              </td>
-                              <td className="px-2 py-1">
-                                <button
-                                  onClick={() => asignarEquipoAlaSolicitud(eq.codigo)}
-                                  className="px-3 py-1 bg-gray-700 dark:bg-gray-600 text-white rounded font-semibold shadow hover:bg-gray-800 dark:hover:bg-gray-500 transition text-xs"
-                                >
-                                  Asignar
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                      {totalPaginasEquipos > 1 && (
-                        <div className="flex justify-center items-center gap-2 mt-2">
-                          <button
-                            onClick={() => setPaginaEquipos(1)}
-                            disabled={paginaEquipos === 1}
-                            className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-                          >
-                            ⏮
-                          </button>
-                          <button
-                            onClick={() => setPaginaEquipos(p => Math.max(1, p - 1))}
-                            disabled={paginaEquipos === 1}
-                            className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-                          >
-                            Anterior
-                          </button>
-                          <span className="text-xs text-gray-700 dark:text-gray-200">
-                            Página {paginaEquipos} de {totalPaginasEquipos}
-                          </span>
-                          <button
-                            onClick={() => setPaginaEquipos(p => Math.min(totalPaginasEquipos, p + 1))}
-                            disabled={paginaEquipos === totalPaginasEquipos}
-                            className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-                          >
-                            Siguiente
-                          </button>
-                          <button
-                            onClick={() => setPaginaEquipos(totalPaginasEquipos)}
-                            disabled={paginaEquipos === totalPaginasEquipos}
-                            className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-                          >
-                            ⏭
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            )}
+      {/* Filtro de unidad de negocio */}
+      <div className="w-full max-w-4xl mb-4">
+        <label className="font-semibold mr-2">Filtrar por unidad de negocio:</label>
+        <select
+          className="p-2 rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+          value={unidadFiltro}
+          onChange={e => {
+            setUnidadFiltro(e.target.value);
+            setSolicitudSeleccionada(null);
+            setEquipoSeleccionado(null);
+            setAsignacionSeleccionada(null);
+          }}
+        >
+          <option value="">Todas</option>
+          {unidadesNegocio.map(un => (
+            <option key={un} value={un}>{un}</option>
+          ))}
+        </select>
+      </div>
 
-            <div className="w-full mt-4">
-              <h3 className="text-base font-semibold mb-2 text-gray-700 dark:text-gray-200">
-                Equipos actualmente asignados en este rango
-              </h3>
-              {(() => {
-                const desdeValidar = solicitudSeleccionada?.editadoportaller && solicitudSeleccionada?.fechadesdeeditada
-                  ? solicitudSeleccionada.fechadesdeeditada
-                  : solicitudSeleccionada?.fecha_desde;
-                const hastaValidar = solicitudSeleccionada?.fecha_hasta;
-
-                function fechasSeSolapan(desdeA, hastaA, desdeB, hastaB) {
-                  return (
-                    new Date(desdeA) <= new Date(hastaB) &&
-                    new Date(desdeB) <= new Date(hastaA)
-                  );
-                }
-
-                // Antes del return, crea un mapa de código de equipo a tipo:
-                const equipoTipoMap = {};
-                (equipos || []).forEach(eq => {
-                  equipoTipoMap[eq.codigo] = eq.tipo_de_equipos;
-                });
-
-                // ...en el render del modal, reemplaza el filtro de solapadas por esto:
-                const solapadas = asignaciones
-                  ?.filter(asig =>
-                    asig &&
-                    asig.asignado_desde &&
-                    asig.asignado_hasta &&
-                    asig.equipo &&
-                    equipoTipoMap[asig.equipo] === solicitudSeleccionada?.tipo && // <-- ahora sí compara bien
-                    fechasSeSolapan(
-                      asig.asignado_desde,
-                      asig.asignado_hasta,
-                      desdeValidar,
-                      hastaValidar
-                    )
-                  ) || [];
-
-                const filasPorPaginaModal = 5;
-                const totalPaginasModal = Math.ceil(solapadas.length / filasPorPaginaModal);
-                const solapadasPagina = solapadas.slice(
-                  (paginaModal - 1) * filasPorPaginaModal,
-                  paginaModal * filasPorPaginaModal
-                );
-
-                if (!solapadas || solapadas.length === 0) {
-                  return (
-                    <p className="text-gray-500 dark:text-gray-400 text-sm text-center">
-                      No hay equipos asignados en este rango.
-                    </p>
-                  );
-                }
-
-                return (
-                  <div>
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
-                          <th className="px-2 py-1 text-center">Código de equipo</th>
-                          <th className="px-2 py-1 text-center">Unidad de negocio</th>
-                          <th className="px-2 py-1 text-center">Desde</th>
-                          <th className="px-2 py-1 text-center">Hasta</th>
-                          <th className="px-2 py-1 text-center"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {solapadasPagina.map((asig, idx) => (
-                          <tr key={asig.equipo + '-' + asig.unidad_de_negocio + '-' + idx} className="border-b last:border-b-0">
-                            <td className="px-2 py-1 text-center">{asig.equipo}</td>
-                            <td className="px-2 py-1 text-center">{asig.unidad_de_negocio}</td>
-                            <td className="px-2 py-1 text-center">{formatearFechaArg(asig.asignado_desde)}</td>
-                            <td className="px-2 py-1 text-center">{formatearFechaArg(asig.asignado_hasta)}</td>
-                            <td className="px-2 py-1 text-center">
-                              <button
-                                onClick={() => {
-                                  setAsignacionAEliminar(asig);
-                                  setShowEliminarAsignacionModal(true);
-                                }}
-                                className="px-3 py-1 bg-gray-500 text-white rounded font-semibold shadow hover:bg-gray-600 transition text-xs"
-                              >
-                                Quitar asignación
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {totalPaginasModal > 1 && (
-                      <div className="flex justify-center items-center gap-2 mt-2">
-                        <button
-                          onClick={() => setPaginaModal(1)}
-                          disabled={paginaModal === 1}
-                          className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-                        >
-                          ⏮
-                        </button>
-                        <button
-                          onClick={() => setPaginaModal(p => Math.max(1, p - 1))}
-                          disabled={paginaModal === 1}
-                          className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-                        >
-                          Anterior
-                        </button>
-                        <span className="text-xs text-gray-700 dark:text-gray-200">
-                          Página {paginaModal} de {totalPaginasModal}
-                        </span>
-                        <button
-                          onClick={() => setPaginaModal(p => Math.min(totalPaginasModal, p + 1))}
-                          disabled={paginaModal === totalPaginasModal}
-                          className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-                        >
-                          Siguiente
-                        </button>
-                        <button
-                          onClick={() => setPaginaModal(totalPaginasModal)}
-                          disabled={paginaModal === totalPaginasModal}
-                          className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold disabled:opacity-50"
-                        >
-                          ⏭
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
-
-            {solicitudSeleccionada?.equipo_asignado && (
-              <button
-                onClick={() => {
-                  setQuitandoAsignacion(true);
-                  setShowEquiposModal(false);
-                  setShowFechaHastaModal(true);
-                  setNuevoEquipo(null);
+      {/* Contenido de pestañas */}
+      {tab === 'asignar' && (
+        <section className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+          <h2 className="text-xl font-bold mb-4 text-gray-700 dark:text-gray-200">Asignar equipos a solicitudes</h2>
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="flex-1">
+              <label className="font-semibold">Solicitudes activas:</label>
+              <select
+                className="w-full p-2 rounded border mt-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                value={solicitudSeleccionada?.id_solicitud || ''}
+                onChange={e => {
+                  const id = e.target.value;
+                  setSolicitudSeleccionada(solicitudesSinAsignar.find(s => String(s.id_solicitud) === id) || null);
+                  setEquipoSeleccionado(null);
                 }}
-                className="mb-2 mt-4 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-semibold hover:bg-gray-200 dark:hover:bg-gray-600 transition border border-gray-300 dark:border-gray-600"
               >
-                Quitar asignación
-              </button>
-            )}
+                <option value="">Seleccione una solicitud</option>
+                {solicitudesSinAsignar.map(s => (
+                  <option
+                    key={s.id_solicitud}
+                    value={String(s.id_solicitud)}
+                  >
+                    {`${s.tipo} - ${s.capacidad} (${s.unidades_necesarias}u) [${s.fecha_desde} a ${s.fecha_hasta}]`}
+                  </option>
+                ))}
+              </select>
+              <DetalleSolicitud solicitud={solicitudSeleccionada} formatearFechaArg={formatearFechaArg} />
+            </div>
+            <div className="flex-1">
+              <label className="font-semibold">Equipos disponibles:</label>
+              <select
+                className="w-full p-2 rounded border mt-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                value={equipoSeleccionado?.codigo || ''}
+                onChange={e => {
+                  const codigo = e.target.value;
+                  setEquipoSeleccionado(equiposDisponibles.find(eq => eq.codigo === codigo) || null);
+                }}
+                disabled={!solicitudSeleccionada}
+              >
+                <option value="">Seleccione un equipo</option>
+                {equiposDisponibles.map(eq => (
+                  <option key={eq.codigo} value={eq.codigo}>
+                    {`${eq.codigo} - ${eq.tipo_de_equipos} - ${eq.capacidad_informada}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex flex-col md:flex-row gap-4 mt-6">
             <button
-              onClick={() => setShowEquiposModal(false)}
-              className="mt-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+              className="px-6 py-2 bg-blue-700 text-white rounded-lg font-semibold shadow hover:bg-blue-800 transition"
+              onClick={handleAsignarEquipo}
+              disabled={!solicitudSeleccionada || !equipoSeleccionado || loading}
             >
-              Cancelar
+              Asignar equipo
+            </button>
+            <button
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold shadow hover:bg-blue-700 transition"
+              style={{ marginLeft: 0 }}
+              onClick={() => {
+                setSolicitudEditando(solicitudSeleccionada);
+                setModalFechaOpen(true);
+              }}
+              disabled={!solicitudSeleccionada}
+            >
+              Editar fecha de inicio
             </button>
           </div>
-        </div>
+        </section>
       )}
 
-      {showFechaHastaModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8 w-full max-w-lg flex flex-col items-center border border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100 text-center">
-              ¿Hasta cuándo trabajó este equipo?
-            </h2>
-            <p className="mb-2 text-gray-700 dark:text-gray-200 text-center">
-              Selecciona la fecha hasta la cual el equipo <span className="font-semibold">{solicitudSeleccionada?.equipo_asignado}</span> estuvo asignado.
-            </p>
-            <input
-              ref={fechaHastaRef}
-              type="date"
-              className="mb-4 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded w-full text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-800"
-              min={solicitudSeleccionada?.fecha_desde}
-              max={solicitudSeleccionada?.fecha_hasta}
-              defaultValue={solicitudSeleccionada?.fecha_hasta}
-            />
-            <div className="flex gap-2 w-full">
-              <button
-                onClick={async () => {
-                  const fechaHasta = fechaHastaRef.current.value;
-                  if (!fechaHasta || !/^\d{4}-\d{2}-\d{2}$/.test(fechaHasta)) {
-                    setMensaje('Por favor, selecciona una fecha válida.');
-                    return;
-                  }
-
-                  if (quitandoAsignacion) {
-                    let updateFields = {
-                      equipo_asignado: null,
-                      editadoportaller: true,
-                      fechadesdeeditada: fechaHasta,
-                    };
-
-                    await supabase
-                      .from('asignaciones_por_unidad_de_negocio')
-                      .update({ asignado_hasta: fechaHasta })
-                      .eq('equipo', solicitudSeleccionada.equipo_asignado)
-                      .eq('asignado_desde', solicitudSeleccionada.fecha_desde);
-
-                    await supabase
-                      .from('solicitudes_equipos')
-                      .update(updateFields)
-                      .eq('id', solicitudSeleccionada.id);
-
-                    setShowFechaHastaModal(false);
-                    setQuitandoAsignacion(false);
-                    setMensaje('Asignación eliminada correctamente.');
-                    fetchSolicitudes();
-                    return;
-                  }
-
-                  await supabase
-                    .from('asignaciones_por_unidad_de_negocio')
-                    .update({ asignado_hasta: fechaHasta })
-                    .eq('equipo', solicitudSeleccionada.equipo_asignado)
-                    .eq('asignado_desde', solicitudSeleccionada.fecha_desde);
-
-                  await supabase
-                    .from('asignaciones_por_unidad_de_negocio')
-                    .insert([{
-                      equipo: nuevoEquipo,
-                      asignado_desde: fechaHasta,
-                      asignado_hasta: solicitudSeleccionada.fecha_hasta,
-                      fecha_de_asignacion: new Date().toISOString(),
-                      unidad_de_negocio: solicitudSeleccionada.unidad_de_negocio,
-                    }]);
-
-                  const { error } = await supabase
-                    .from('solicitudes_equipos')
-                    .update({
-                      equipo_asignado: nuevoEquipo,
-                      fecha_asignacion: new Date().toISOString(),
-                    })
-                    .eq('id', solicitudSeleccionada.id);
-
-                  setShowFechaHastaModal(false);
-                  setNuevoEquipo(null);
-
-                  if (!error) {
-                    setMensaje('Equipo reasignado correctamente.');
-                    setShowEquiposModal(false);
-                    fetchSolicitudes();
-                  } else {
-                    setMensaje('Error al reasignar equipo.');
-                  }
+      {tab === 'reemplazar' && (
+        <section className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+          <h2 className="text-xl font-bold mb-4 text-gray-700 dark:text-gray-200">Reemplazar equipo asignado</h2>
+          <div className="flex flex-col md:flex-row gap-6">
+            <div className="flex-1">
+              <label className="font-semibold">Asignaciones activas:</label>
+              <select
+                className="w-full p-2 rounded border mt-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+                value={asignacionSeleccionada?.id_asignacion || ''}
+                onChange={e => {
+                  const id = e.target.value;
+                  setAsignacionSeleccionada(asignacionesUltimas.find(a => String(a.id_asignacion) === id) || null);
+                  setEquipoSeleccionado(null);
                 }}
-                className="flex-1 px-4 py-2 bg-blue-700 dark:bg-blue-600 text-white rounded font-semibold hover:bg-blue-800 dark:hover:bg-blue-700 transition"
               >
-                Confirmar
-              </button>
-              <button
-                onClick={() => {
-                  setShowFechaHastaModal(false);
-                  setNuevoEquipo(null);
-                  setQuitandoAsignacion(false);
+                <option value="">Seleccione una asignación</option>
+                {asignacionesUltimas.map(a => (
+                  <option key={a.id_asignacion} value={String(a.id_asignacion)}>
+                    {`Equipo: ${a.codigo_equipo} | Solicitud: ${a.id_solicitud} | Desde: ${a.fecha_inicio_asignacion}`}
+                  </option>
+                ))}
+              </select>
+              <DetalleAsignacion
+                asignacion={asignacionSeleccionada}
+                solicitud={asignacionSeleccionada && solicitudes.find(s => s.id_solicitud === asignacionSeleccionada.id_solicitud)}
+                formatearFechaArg={formatearFechaArg}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="font-semibold">Equipos compatibles para reemplazo:</label>
+              <select
+                className="w-full p-2 rounded border mt-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition"
+                value={equipoSeleccionado?.codigo || ''}
+                onChange={e => {
+                  const codigo = e.target.value;
+                  setEquipoSeleccionado(equiposCompatibles.find(eq => eq.codigo === codigo) || null);
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                disabled={!asignacionSeleccionada}
               >
-                Cancelar
-              </button>
-              <button
-                onClick={async () => {
-                  const desdeAsignacion =
-                    solicitudSeleccionada.editadoportaller && solicitudSeleccionada.fechadesdeeditada
-                      ? solicitudSeleccionada.fechadesdeeditada
-                      : solicitudSeleccionada.fecha_desde;
-
-                  await supabase
-                    .from('asignaciones_por_unidad_de_negocio')
-                    .delete()
-                    .eq('equipo', solicitudSeleccionada.equipo_asignado)
-                    .eq('asignado_desde', desdeAsignacion);
-
-                  await supabase
-                    .from('solicitudes_equipos')
-                    .update({ equipo_asignado: null })
-                    .eq('id', solicitudSeleccionada.id);
-
-                  setShowFechaHastaModal(false);
-                  setQuitandoAsignacion(false);
-                  setMensaje('Asignación eliminada correctamente.');
-                  fetchSolicitudes();
-                }}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded font-semibold hover:bg-red-700 transition"
-              >
-                El equipo no trabajó
-              </button>
+                <option value="">Seleccione un equipo</option>
+                {equiposCompatibles.map(eq => (
+                  <option key={eq.codigo} value={eq.codigo}>
+                    {`${eq.codigo} - ${eq.tipo_de_equipos} - ${eq.capacidad_informada} (${eq.unidad_negocio_actual || 'Sin unidad'})`}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        </div>
-      )}
-
-      {showReiniciarModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8 w-full max-w-md flex flex-col items-center border border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100 text-center">
-              ¿Está seguro que desea reiniciar la solicitud?
-            </h2>
-            <p className="mb-4 text-gray-700 dark:text-gray-200 text-center">
-              Esta acción quitará el estado de edición por taller y la fecha editada.
-            </p>
-            <div className="flex gap-2 w-full">
-              <button
-                onClick={() => setShowReiniciarModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => reiniciarSolicitud(reiniciarId)}
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded font-semibold hover:bg-gray-600 transition"
-              >
-                Reiniciar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showEliminarAsignacionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-8 w-full max-w-md flex flex-col items-center border border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100 text-center">
-              ¿Está seguro que desea quitar esta asignación?
-            </h2>
-            <p className="mb-4 text-gray-700 dark:text-gray-200 text-center">
-              Equipo: <span className="font-semibold">{asignacionAEliminar?.equipo}</span><br />
-              Unidad de negocio: <span className="font-semibold">{asignacionAEliminar?.unidad_de_negocio}</span><br />
-              Desde: <span className="font-semibold">{formatearFechaArg(asignacionAEliminar?.asignado_desde)}</span><br />
-              Hasta: <span className="font-semibold">{formatearFechaArg(asignacionAEliminar?.asignado_hasta)}</span>
-            </p>
-            <div className="flex gap-2 w-full">
-              <button
-                onClick={() => setShowEliminarAsignacionModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={async () => {
-                  await supabase
-                    .from('asignaciones_por_unidad_de_negocio')
-                    .delete()
-                    .eq('equipo', asignacionAEliminar.equipo)
-                    .eq('asignado_desde', asignacionAEliminar.asignado_desde);
-
-                  // Si hay una solicitud relacionada, actualiza equipo_asignado a null
-                  await supabase
-                    .from('solicitudes_equipos')
-                    .update({ equipo_asignado: null })
-                    .eq('equipo_asignado', asignacionAEliminar.equipo)
-                    .eq('fecha_desde', asignacionAEliminar.asignado_desde);
-
-                  setShowEliminarAsignacionModal(false);
-                  setAsignacionAEliminar(null);
-                  setMensaje('Asignación eliminada correctamente.');
-                  fetchAsignaciones();
-                  fetchSolicitudes();
+          <div className="mt-4 flex flex-row gap-4 items-end justify-center">
+            <div className="flex flex-col max-w-xs w-full">
+              <label className="font-semibold mb-1 text-gray-700 dark:text-gray-100">
+                Fecha de reemplazo
+              </label>
+              <input
+                type="date"
+                className={`p-2 rounded border ${fechaReemplazoTouched && !fechaReemplazo ? 'border-red-500' : ''}`}
+                placeholder="Fecha de reemplazo"
+                value={fechaReemplazo}
+                min={
+                  asignacionSeleccionada
+                    ? (
+                        asignacionSeleccionada.fecha_inicio_asignacion
+                          ? asignacionSeleccionada.fecha_inicio_asignacion
+                          : solicitudes.find(s => s.id_solicitud === asignacionSeleccionada.id_solicitud)?.fecha_desde
+                      )
+                    : ''
+                }
+                max={
+                  asignacionSeleccionada
+                    ? solicitudes.find(s => s.id_solicitud === asignacionSeleccionada.id_solicitud)?.fecha_hasta
+                    : ''
+                }
+                onChange={e => {
+                  setFechaReemplazo(e.target.value);
+                  setFechaReemplazoTouched(true);
+                  if (asignacionSeleccionada) filtrarEquiposCompatibles(asignacionSeleccionada);
                 }}
-                className="flex-1 px-4 py-2 bg-gray-500 text-white rounded font-semibold hover:bg-gray-600 transition"
-              >
-                Quitar asignación
-              </button>
+                onBlur={() => setFechaReemplazoTouched(true)}
+                disabled={!asignacionSeleccionada}
+                required
+              />
+              {fechaReemplazoTouched && !fechaReemplazo && (
+                <span className="text-xs text-red-600 mt-1">La fecha de reemplazo es obligatoria.</span>
+              )}
             </div>
+            <div className="flex flex-col max-w-xs w-full">
+              <div className="mb-1">&nbsp;</div>
+              <input
+                type="text"
+                className={`p-2 rounded border ${fechaReemplazoTouched && !motivoReemplazo ? 'border-red-500' : ''}`}
+                placeholder="Motivo del reemplazo"
+                value={motivoReemplazo}
+                onChange={e => setMotivoReemplazo(e.target.value)}
+                // Ahora siempre habilitado, aunque no haya equipo seleccionado
+                disabled={!asignacionSeleccionada}
+                required
+              />
+              {fechaReemplazoTouched && !motivoReemplazo && (
+                <span className="text-xs text-red-600 mt-1">El motivo es obligatorio.</span>
+              )}
+            </div>
+            <button
+              className={`px-6 py-2 rounded-lg font-semibold shadow max-w-xs w-full transition
+                ${(!asignacionSeleccionada || !equipoSeleccionado || !motivoReemplazo || !fechaReemplazo || loading)
+                  ? 'bg-yellow-200 text-yellow-700 cursor-not-allowed opacity-60'
+                  : 'bg-yellow-600 text-white hover:bg-yellow-700'}`}
+              onClick={() => {
+                setFechaReemplazoTouched(true);
+                if (!equipoSeleccionado) {
+                  setMensaje('Debe seleccionar un equipo para reemplazar.');
+                  return;
+                }
+                if (
+                  asignacionSeleccionada &&
+                  equipoSeleccionado &&
+                  motivoReemplazo &&
+                  fechaReemplazo &&
+                  !loading
+                ) {
+                  handleReemplazarEquipo();
+                }
+              }}
+              // El botón nunca está disabled, solo visualmente desactivado
+            >
+              Reemplazar equipo
+            </button>
           </div>
-        </div>
+          <button
+            className={`mt-8 px-6 py-2 rounded-lg font-semibold shadow max-w-xs w-full transition
+              ${(!asignacionSeleccionada || loading)
+                ? 'bg-red-200 text-red-700 cursor-not-allowed opacity-60'
+                : 'bg-red-600 text-white hover:bg-red-700'}`}
+            onClick={() => setModalRetiroOpen(true)}
+            disabled={!asignacionSeleccionada || loading}
+          >
+            Quitar equipo de solicitud
+          </button>
+        </section>
       )}
+
+      <ModalRetiroEquipo
+        open={modalRetiroOpen}
+        onClose={() => setModalRetiroOpen(false)}
+        onConfirm={handleQuitarEquipo}
+        fechaMin={
+          asignacionSeleccionada
+            ? (
+                asignacionSeleccionada.fecha_inicio_asignacion
+                  ? asignacionSeleccionada.fecha_inicio_asignacion
+                  : solicitudes.find(s => s.id_solicitud === asignacionSeleccionada.id_solicitud)?.fecha_desde
+              )
+            : ''
+        }
+        fechaMax={
+          asignacionSeleccionada
+            ? solicitudes.find(s => s.id_solicitud === asignacionSeleccionada.id_solicitud)?.fecha_hasta
+            : ''
+        }
+      />
+      <ModalEditarFecha
+        open={modalFechaOpen}
+        onClose={() => setModalFechaOpen(false)}
+        fechaActual={solicitudEditando?.fecha_desde}
+        fechaMin="2020-01-01"
+        fechaMax={solicitudEditando?.fecha_hasta}
+        onConfirm={handleEditarFechaInicio}
+      />
     </main>
   );
 }
