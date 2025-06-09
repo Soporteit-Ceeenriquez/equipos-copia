@@ -768,7 +768,7 @@ export default function AsignarEquiposPage() {
                 <option value="">Seleccione un equipo</option>
                 {equiposCompatibles.map(eq => (
                   <option key={eq.codigo} value={eq.codigo}>
-                    {`${eq.codigo} - ${eq.tipo_de_equipos} - ${eq.capacidad_informada} (${eq.unidad_negocio_actual || 'Sin unidad'})`}
+                    {`${eq.codigo} - ${eq.tipo_de_equipos} - ${eq.capacidad_informada}`}
                   </option>
                 ))}
               </select>
