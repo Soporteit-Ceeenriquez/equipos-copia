@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function Home() {
   const router = useRouter();
@@ -30,8 +30,8 @@ export default function Home() {
         <Image
           src="/CEE-MARCA.png"
           alt="CEE Logo"
-          width={180} // Duplicado de 90 a 180
-          height={180} // Duplicado de 90 a 180
+          width={180}
+          height={180}
           className="transition-all duration-300 dark:invert"
           priority
         />
