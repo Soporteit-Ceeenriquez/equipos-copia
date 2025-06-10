@@ -121,6 +121,12 @@ export default function Page() {
     setPaginaUnidad(1);
   }, [filtroUnidadSolicitante]);
 
+  useEffect(() => {
+    if (role === "solicitante" && unidadesNegocio.length === 1 && filtroUnidadSolicitante !== unidadesNegocio[0]) {
+      setFiltroUnidadSolicitante(unidadesNegocio[0]);
+    }
+  }, [role, unidadesNegocio, filtroUnidadSolicitante]);
+
   // --- CARGA DE DATOS INICIALES ---
   useEffect(() => {
     async function fetchUserAndRole() {
@@ -497,52 +503,37 @@ export default function Page() {
                 {unidadesNegocio[0]}
               </div>
             ) : (
-              <div className="relative w-full">
-                <select
-                  name="unidad_de_negocio"
-                  value={form.unidad_de_negocio}
-                  onChange={handleChange}
-                  required
-                  className="p-2 rounded border border-gray-300 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 transition w-full"
-                  style={{
-                    minHeight: '2.5rem',
-                    fontWeight: 'bold',
-                    fontSize: '1rem',
-                    paddingRight: '2rem',
-                    textOverflow: 'ellipsis',
-                    overflow: 'hidden'
-                  }}
-                >
-                  <option value="">Seleccione una unidad</option>
-                  {unidadesNegocio.map(un => (
-                    <option
-                      key={un}
-                      value={un}
-                      title={un}
-                      style={{
-                        whiteSpace: 'normal',
-                        wordBreak: 'break-word',
-                        overflowWrap: 'break-word'
-                      }}
-                    >
-                      {un}
-                    </option>
-                  ))}
-                </select>
-                {/* Si el texto seleccionado es muy largo, lo mostramos debajo */}
-                {form.unidad_de_negocio && form.unidad_de_negocio.length > 40 && (
-                  <div
-                    className="mt-1 text-gray-900 dark:text-gray-100 font-semibold break-words text-xs bg-gray-50 dark:bg-gray-900 rounded p-2 border border-gray-200 dark:border-gray-700 shadow"
+              <select
+                name="unidad_de_negocio"
+                value={form.unidad_de_negocio}
+                onChange={handleChange}
+                required
+                className="p-2 rounded border border-gray-300 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 transition"
+                style={{
+                  minHeight: '2.5rem',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  paddingRight: '2rem',
+                  textOverflow: 'ellipsis',
+                  overflow: 'hidden'
+                }}
+              >
+                <option value="">Seleccione una unidad</option>
+                {unidadesNegocio.map(un => (
+                  <option
+                    key={un}
+                    value={un}
+                    title={un}
                     style={{
+                      whiteSpace: 'normal',
                       wordBreak: 'break-word',
-                      overflowWrap: 'break-word',
-                      maxWidth: '100%'
+                      overflowWrap: 'break-word'
                     }}
                   >
-                    {form.unidad_de_negocio}
-                  </div>
-                )}
-              </div>
+                    {un}
+                  </option>
+                ))}
+              </select>
             )}
             {/* Si solo hay una unidad, seleccionarla automáticamente */}
             {unidadesNegocio.length === 1 && form.unidad_de_negocio !== unidadesNegocio[0] && (
@@ -863,16 +854,34 @@ export default function Page() {
                   <label className="mr-2 font-semibold text-gray-700 dark:text-gray-200">
                     Seleccione unidad de negocio:
                   </label>
-                  <select
-                    value={filtroUnidadSolicitante || ''}
-                    onChange={e => setFiltroUnidadSolicitante(e.target.value)}
-                    className="p-2 rounded border border-gray-300 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 transition"
-                  >
-                    <option value="">Seleccione una unidad</option>
-                    {unidadesNegocio.map(un => (
-                      <option key={un} value={un}>{un}</option>
-                    ))}
-                  </select>
+                  {unidadesNegocio.length === 1 ? (
+                    <div
+                      className="w-full p-2 rounded border border-gray-300 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 font-semibold"
+                      style={{
+                        cursor: 'default',
+                        opacity: 1,
+                        whiteSpace: 'normal',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
+                        minHeight: '2.5rem',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {unidadesNegocio[0]}
+                    </div>
+                  ) : (
+                    <select
+                      value={filtroUnidadSolicitante || ''}
+                      onChange={e => setFiltroUnidadSolicitante(e.target.value)}
+                      className="p-2 rounded border border-gray-300 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-400 transition"
+                    >
+                      <option value="">Seleccione una unidad</option>
+                      {unidadesNegocio.map(un => (
+                        <option key={un} value={un}>{un}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
               {filtroUnidadSolicitante ? (
