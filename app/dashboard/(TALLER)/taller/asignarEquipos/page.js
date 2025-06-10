@@ -429,6 +429,7 @@ export default function AsignarEquiposPage() {
       codigo_equipo: equipoSeleccionado.codigo,
       id_solicitud: solicitudSeleccionada.id_solicitud,
       fecha_inicio_asignacion: solicitudSeleccionada.fecha_desde,
+      fecha_fin_asignacion: solicitudSeleccionada.fecha_hasta,
       es_reemplazo: false,
       usuario_que_asigno: 'usuario_actual',
       fecha_asignacion: new Date().toISOString(),
