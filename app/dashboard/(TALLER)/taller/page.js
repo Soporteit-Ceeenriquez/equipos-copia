@@ -1,9 +1,9 @@
 'use client';
 
 import { supabase } from '@/utils/supabase';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 
 export default function TallerPage() {
   const router = useRouter();
@@ -98,9 +98,15 @@ export default function TallerPage() {
         </button>
         <button
           onClick={() => router.push('/dashboard/taller/gestionarAsignaciones')}
-          className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold shadow hover:bg-blue-700 transition"
+          className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold shadow hover:bg-blue-700 transition mb-4"
         >
           Gestión de Equipos Asignados
+        </button>
+        <button
+          onClick={() => router.push('/dashboard/solicitarEquipos')}
+          className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold shadow hover:bg-blue-800 transition"
+        >
+          Solicitudes de Equipos
         </button>
       </div>
     </main>

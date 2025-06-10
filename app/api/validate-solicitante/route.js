@@ -12,7 +12,7 @@ export async function POST(request) {
   const { data: { user }, error } = await supabase.auth.getUser(token);
 
   if (error || !user) {
-    return Response.json({ isSolicitante: false }, { status: 401 });
+    return Response.json({ isSolicitante: false, isTaller: false, isAdmin: false }, { status: 401 });
   }
 
   // Consulta el rol en la tabla user_roles
@@ -22,13 +22,11 @@ export async function POST(request) {
     .eq('user_id', user.id)
     .single();
 
-  if (
-    roleData?.role === 'solicitante' ||
-    roleData?.role === 'taller' ||
-    roleData?.role === 'admin'
-  ) {
-    return Response.json({ isSolicitante: true });
-  } else {
-    return Response.json({ isSolicitante: false }, { status: 403 });
-  }
+  const role = roleData?.role || '';
+
+  return Response.json({
+    isSolicitante: role === 'solicitante',
+    isTaller: role === 'taller',
+    isAdmin: role === 'admin'
+  }, { status: role ? 200 : 403 });
 }
