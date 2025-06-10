@@ -5,8 +5,21 @@ import { useEffect, useState } from "react";
 
 function formatFecha(fecha) {
   if (!fecha) return "-";
+  // Si es yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    const [anio, mes, dia] = fecha.split("-");
+    return `${dia}/${mes}/${anio}`;
+  }
+  // Si es dd/mm/yyyy
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(fecha)) {
+    return fecha;
+  }
+  // Si es Date o ISO
   const d = new Date(fecha);
-  return d.toLocaleDateString("es-AR", { year: "numeric", month: "2-digit", day: "2-digit" });
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  const anio = d.getFullYear();
+  return `${dia}/${mes}/${anio}`;
 }
 
 export default function GestionAsignaciones() {
@@ -19,7 +32,7 @@ export default function GestionAsignaciones() {
   const [solicitudesMap, setSolicitudesMap] = useState({});
   const [pagina, setPagina] = useState(1);
   const filasPorPagina = 8;
-  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [filtroMes, setFiltroMes] = useState(""); // <--- NUEVO
   const router = useRouter();
 
   useEffect(() => {
@@ -51,13 +64,8 @@ export default function GestionAsignaciones() {
   }, [checkingAccess, unidadFiltro, codigoFiltro]);
 
   useEffect(() => {
-    setPagina(1); // Reinicia a la primera página si cambian los filtros
-  }, [unidadFiltro, codigoFiltro]);
-
-  useEffect(() => {
-    // Actualiza el total de páginas cuando cambian las asignaciones
-    setTotalPaginas(Math.max(1, Math.ceil(asignaciones.length / filasPorPagina)));
-  }, [asignaciones]);
+    setPagina(1);
+  }, [unidadFiltro, codigoFiltro, filtroMes]);
 
   async function fetchAsignaciones() {
     // 1. Traer asignaciones
@@ -108,10 +116,15 @@ export default function GestionAsignaciones() {
     setAsignaciones(filtradas || []);
     setSolicitudesMap(solicitudesMap);
     setUnidadesNegocio(unidades);
-    // Codigos de equipo únicos
+
+    // Codigos de equipo únicos, filtrados por unidad de negocio seleccionada
+    let asignacionesParaCodigos = asignacionesData;
+    if (unidadFiltro) {
+      asignacionesParaCodigos = asignacionesData.filter(a => solicitudesMap[a.id_solicitud] === unidadFiltro);
+    }
     const codigos = [
       ...new Set(
-        (asignacionesData || [])
+        (asignacionesParaCodigos || [])
           .map((a) => a.codigo_equipo)
           .filter(Boolean)
       ),
@@ -134,11 +147,24 @@ export default function GestionAsignaciones() {
     );
   }
 
+  // Filtrado por mes (igual que en solicitarEquipos)
+  const asignacionesFiltradas = asignaciones.filter(a => {
+    if (!filtroMes) return true;
+    if (!a.fecha_inicio_asignacion || !a.fecha_fin_asignacion) return false;
+    const desde = new Date(a.fecha_inicio_asignacion);
+    const hasta = new Date(a.fecha_fin_asignacion);
+    const [anio, mes] = filtroMes.split('-');
+    const primerDiaMes = new Date(Number(anio), Number(mes) - 1, 1);
+    const ultimoDiaMes = new Date(Number(anio), Number(mes), 0);
+    return hasta >= primerDiaMes && desde <= ultimoDiaMes;
+  });
+
   // Datos paginados
-  const asignacionesPaginadas = asignaciones.slice(
+  const asignacionesPaginadas = asignacionesFiltradas.slice(
     (pagina - 1) * filasPorPagina,
     pagina * filasPorPagina
   );
+  const totalPaginas = Math.max(1, Math.ceil(asignacionesFiltradas.length / filasPorPagina));
 
   return (
     <main className="min-h-screen flex flex-col items-center bg-gray-50 dark:bg-gray-900 p-6">
@@ -188,6 +214,15 @@ export default function GestionAsignaciones() {
             </option>
           ))}
         </select>
+        {/* FILTRO POR MES */}
+        <label className="font-semibold ml-4">Filtrar por mes:</label>
+        <input
+          type="month"
+          value={filtroMes}
+          onChange={e => setFiltroMes(e.target.value)}
+          className="p-2 rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+          placeholder="Filtrar por mes"
+        />
       </div>
       <div className="w-full max-w-7xl overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <table className="min-w-full text-sm">
