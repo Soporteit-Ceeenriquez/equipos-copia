@@ -32,8 +32,12 @@ export default function GestionAsignaciones() {
   const [solicitudesMap, setSolicitudesMap] = useState({});
   const [pagina, setPagina] = useState(1);
   const filasPorPagina = 8;
-  const [filtroMes, setFiltroMes] = useState(""); // <--- NUEVO
+  const [filtroMes, setFiltroMes] = useState("");
   const router = useRouter();
+
+  // NUEVO: Estados para modal y asignación a eliminar
+  const [mostrarModal, setMostrarModal] = useState(false);
+  const [asignacionAEliminar, setAsignacionAEliminar] = useState(null);
 
   useEffect(() => {
     const validar = async () => {
@@ -130,6 +134,22 @@ export default function GestionAsignaciones() {
       ),
     ];
     setCodigosEquipo(codigos);
+  }
+
+  // Eliminar asignación con confirmación
+  async function eliminarAsignacion(asignacion) {
+    if (!asignacion) return;
+    await supabase
+      .from("asignaciones")
+      .delete()
+      .match({
+        codigo_equipo: asignacion.codigo_equipo,
+        id_solicitud: asignacion.id_solicitud,
+        fecha_asignacion: asignacion.fecha_asignacion,
+      });
+    setMostrarModal(false);
+    setAsignacionAEliminar(null);
+    fetchAsignaciones();
   }
 
   function cerrarSesion() {
@@ -236,12 +256,13 @@ export default function GestionAsignaciones() {
               <th className="px-4 py-2 text-center">Es Reemplazo</th>
               <th className="px-4 py-2 text-center">Motivo Reemplazo</th>
               <th className="px-4 py-2 text-center">Fecha Asignación</th>
+              <th className="px-4 py-2 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {asignacionesPaginadas.length === 0 && (
               <tr>
-                <td colSpan={8} className="text-center py-4 text-gray-500">
+                <td colSpan={9} className="text-center py-4 text-gray-500">
                   No hay asignaciones para mostrar.
                 </td>
               </tr>
@@ -256,6 +277,17 @@ export default function GestionAsignaciones() {
                 <td className="px-4 py-2">{a.es_reemplazo ? "Sí" : "No"}</td>
                 <td className="px-4 py-2">{a.motivo_reemplazo || "-"}</td>
                 <td className="px-4 py-2">{formatFecha(a.fecha_asignacion)}</td>
+                <td className="px-4 py-2">
+                  <button
+                    className="bg-red-500 hover:bg-red-700 text-white px-3 py-1 rounded"
+                    onClick={() => {
+                      setAsignacionAEliminar(a);
+                      setMostrarModal(true);
+                    }}
+                  >
+                    Eliminar
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -281,6 +313,34 @@ export default function GestionAsignaciones() {
           </button>
         </div>
       </div>
+
+      {/* MODAL DE CONFIRMACIÓN */}
+      {mostrarModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-sm w-full">
+            <h2 className="text-lg font-bold mb-4 text-gray-800 dark:text-gray-100">
+              ¿Eliminar asignación?
+            </h2>
+            <p className="mb-6 text-gray-700 dark:text-gray-300">
+              ¿Estás seguro de que deseas eliminar esta asignación?
+            </p>
+            <div className="flex justify-end gap-4">
+              <button
+                className="px-4 py-2 bg-gray-300 dark:bg-gray-600 rounded hover:bg-gray-400 dark:hover:bg-gray-700"
+                onClick={() => setMostrarModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                onClick={() => eliminarAsignacion(asignacionAEliminar)}
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

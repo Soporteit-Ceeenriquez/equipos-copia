@@ -223,6 +223,7 @@ export default function AsignarEquiposPage() {
   const [modalRetiroOpen, setModalRetiroOpen] = useState(false);
   const [modalFechaOpen, setModalFechaOpen] = useState(false);
   const [solicitudEditando, setSolicitudEditando] = useState(null);
+  const [userEmail, setUserEmail] = useState(''); // <--- NUEVO
 
   // --- VALIDACIÓN DE ACCESO ---
   useEffect(() => {
@@ -230,6 +231,7 @@ export default function AsignarEquiposPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) return router.replace('/login');
+      setUserEmail(session.user.email); // <--- GUARDAR EMAIL
       const res = await fetch('/api/validate-taller', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -431,7 +433,7 @@ export default function AsignarEquiposPage() {
       fecha_inicio_asignacion: solicitudSeleccionada.fecha_desde,
       fecha_fin_asignacion: solicitudSeleccionada.fecha_hasta,
       es_reemplazo: false,
-      usuario_que_asigno: 'usuario_actual',
+      usuario_que_asigno: userEmail, // <--- AQUÍ
       fecha_asignacion: new Date().toISOString(),
     };
     const { error } = await supabase.from('asignaciones').insert([insertData]);
@@ -473,11 +475,11 @@ export default function AsignarEquiposPage() {
       codigo_equipo: equipoSeleccionado.codigo,
       id_solicitud: asignacionSeleccionada.id_solicitud,
       fecha_inicio_asignacion: fechaReemplazo,
-      fecha_fin_asignacion: solicitud?.fecha_hasta || null, // <-- SIEMPRE el hasta de la solicitud
+      fecha_fin_asignacion: solicitud?.fecha_hasta || null,
       es_reemplazo: true,
       id_asignacion_reemplazada: asignacionSeleccionada.id_asignacion,
       motivo_reemplazo: motivoReemplazo,
-      usuario_que_asigno: 'usuario_actual',
+      usuario_que_asigno: userEmail, // <--- AQUÍ
       fecha_asignacion: new Date().toISOString(),
     }]);
     if (!error) {
