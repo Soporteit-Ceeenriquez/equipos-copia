@@ -23,7 +23,7 @@ export default function Home() {
   return (
     <main className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-gray-100 via-blue-50 to-gray-200 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 text-gray-900 dark:text-white p-8">
       <h1 className="text-4xl font-bold mb-4 text-center drop-shadow">
-        Gestión de equipos
+        Gestión de Equipos - CEE Enriquez
       </h1>
       <div className="w-24 h-1 bg-blue-600 rounded-full mb-8 mx-auto" />
       <div className="mb-8 flex items-center justify-center">

@@ -12,12 +12,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Gestión de Equipos CEE",
-  description: "Sistema para la gestión y asignación de equipos en CEE.",
-  keywords: ["gestión de equipos", "CEE", "logística", "asignación", "taller"],
+  title: "Gestión de Equipos - CEE Enriquez",
+  description: "Sistema para la gestión y asignación de equipos en CEE Enriquez.",
+  keywords: ["gestión de equipos", "CEE Enriquez", "logística", "asignación", "taller"],
   openGraph: {
-    title: "Gestión de Equipos CEE",
-    description: "Sistema para la gestión y asignación de equipos en CEE.",
+    title: "Gestión de Equipos - CEE Enriquez",
+    description: "Sistema para la gestión y asignación de equipos en CEE Enriquez.",
     locale: "es_ES",
     type: "website",
   },
